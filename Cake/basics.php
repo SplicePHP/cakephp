@@ -25,13 +25,13 @@ use Cake\Utility\Debugger;
 /**
  * Basic defines for timing functions.
  */
-	define('SECOND', 1);
-	define('MINUTE', 60);
-	define('HOUR', 3600);
-	define('DAY', 86400);
-	define('WEEK', 604800);
-	define('MONTH', 2592000);
-	define('YEAR', 31536000);
+	defined('SECOND')?null:define('SECOND', 1);
+	defined('MINUTE')?null:define('MINUTE', 60);
+	defined('HOUR')?null:define('HOUR', 3600);
+	defined('DAY')?null:define('DAY', 86400);
+	defined('WEEK')?null:define('WEEK', 604800);
+	defined('MONTH')?null:define('MONTH', 2592000);
+	defined('YEAR')?null:define('YEAR', 31536000);
 
 if (!function_exists('config')) {
 
