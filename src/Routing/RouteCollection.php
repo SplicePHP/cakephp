@@ -53,6 +53,20 @@ class RouteCollection {
 	protected $_named = [];
 
 /**
+ * Routes indexed by path prefix.
+ *
+ * @var array
+ */
+	protected $_paths = [];
+
+/**
+ * Route extensions
+ *
+ * @var array
+ */
+	protected $_extensions = [];
+
+/**
  * Add a route to the collection.
  *
  * @param \Cake\Routing\Route\Route $route The route object to add.
@@ -82,6 +96,11 @@ class RouteCollection {
 			krsort($this->_paths);
 		}
 		$this->_paths[$path][] = $route;
+
+		$extensions = $route->extensions();
+		if ($extensions) {
+			$this->addExtensions($extensions);
+		}
 	}
 
 /**
@@ -253,6 +272,29 @@ class RouteCollection {
  */
 	public function named() {
 		return $this->_named;
+	}
+
+/**
+ * Add one or more extensions.
+ *
+ * @param array $extensions The extensions to add.
+ * @return void
+ */
+	public function addExtensions(array $extensions) {
+		$this->_extensions = array_unique(array_merge($this->_extensions, $extensions));
+	}
+
+/**
+ * Get/set the extensions that the route collection could handle.
+ *
+ * @param null|string|array $extensions Either the list of extensions to set, or null to get.
+ * @return array The valid extensions.
+ */
+	public function extensions($extensions = null) {
+		if ($extensions === null) {
+			return array_unique($this->_extensions);
+		}
+		$this->_extensions = (array)$extensions;
 	}
 
 }

@@ -45,7 +45,7 @@ trait CellTrait {
  *
  * Cells are not rendered until they are echoed.
  *
- * @param string $cell You must indicate both cell name, and optionally a cell action. e.g.: `TagCloud::smallList`
+ * @param string $cell You must indicate cell name, and optionally a cell action. e.g.: `TagCloud::smallList`
  * will invoke `View\Cell\TagCloudCell::smallList()`, `display` action will be invoked by default when none is provided.
  * @param array $data Additional arguments for cell method. e.g.:
  *    `cell('TagCloud::smallList', ['a1' => 'v1', 'a2' => 'v2'])` maps to `View\Cell\TagCloud::smallList(v1, v2)`
@@ -54,10 +54,10 @@ trait CellTrait {
  * @throws \Cake\View\Error\MissingCellException If Cell class was not found.
  * @throws \BadMethodCallException If Cell class does not specified cell action.
  */
-	public function cell($cell, $data = [], $options = []) {
+	public function cell($cell, array $data = [], array $options = []) {
 		$parts = explode('::', $cell);
 
-		if (count($parts) == 2) {
+		if (count($parts) === 2) {
 			list($pluginAndCell, $action) = [$parts[0], $parts[1]];
 		} else {
 			list($pluginAndCell, $action) = [$parts[0], 'display'];
