@@ -15,11 +15,11 @@
 namespace Cake\Test\TestCase\ORM;
 
 use Cake\Core\Plugin;
+use Cake\I18n\Time;
 use Cake\ORM\Query;
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
-use Cake\Utility\Time;
 
 /**
  * Contains regression test for the Query builder
@@ -33,13 +33,14 @@ class QueryRegressionTest extends TestCase {
  * @var array
  */
 	public $fixtures = [
-		'core.user',
-		'core.article',
-		'core.comment',
-		'core.tag',
-		'core.articles_tag',
-		'core.author',
-		'core.special_tag'
+		'core.users',
+		'core.articles',
+		'core.comments',
+		'core.tags',
+		'core.articles_tags',
+		'core.authors',
+		'core.special_tags',
+		'core.translates',
 	];
 
 /**
@@ -99,11 +100,12 @@ class QueryRegressionTest extends TestCase {
 		]);
 		$table->Things->target()->belongsTo('Stuff', [
 			'foreignKey' => 'tag_id',
-			'propertyName' => 'foo']
-		);
+			'propertyName' => 'foo'
+		]);
 
 		$results = $table->find()
 			->contain(['Authors.Stuff', 'Things.Stuff'])
+			->order(['Articles.id' => 'ASC'])
 			->toArray();
 
 		$this->assertEquals(1, $results[0]->articles_tag->foo->id);
@@ -193,7 +195,7 @@ class QueryRegressionTest extends TestCase {
 		$tags->belongsToMany('Articles');
 
 		$result = $articles->find()->contain(['Tags'])->first();
-		$sub = $articles->Tags->find()->select(['id'])->matching('Articles', function($q) use ($result) {
+		$sub = $articles->Tags->find()->select(['id'])->matching('Articles', function ($q) use ($result) {
 			return $q->where(['Articles.id' => 1]);
 		});
 
@@ -280,13 +282,26 @@ class QueryRegressionTest extends TestCase {
 		$articles = TableRegistry::get('Articles');
 		$articles->belongsTo('Authors');
 
-		$articles->eventManager()->attach(function($event, $query) {
+		$articles->eventManager()->attach(function ($event, $query) {
 			return $query->contain('Authors');
 		}, 'Model.beforeFind');
 
 		$article = $articles->newEntity();
 		$article->title = 'Foo';
 		$article->body = 'Bar';
+		$this->assertSame($article, $articles->save($article));
+	}
+
+/**
+ * Test that save() works with entities containing expressions
+ * as properties.
+ *
+ * @return void
+ */
+	public function testSaveWithExpressionProperty() {
+		$articles = TableRegistry::get('Articles');
+		$article = $articles->newEntity();
+		$article->title = new \Cake\Database\Expression\QueryExpression("SELECT 'jose'");
 		$this->assertSame($article, $articles->save($article));
 	}
 
@@ -372,6 +387,119 @@ class QueryRegressionTest extends TestCase {
 			$result->author->id,
 			'No SQL error and author exists.'
 		);
+	}
+
+/**
+ * Tests that loading associations having the same alias in the
+ * joinable associations chain is not sensitive to the order in which
+ * the associations are selected.
+ *
+ * @see https://github.com/cakephp/cakephp/issues/4454
+ * @return void
+ */
+	public function testAssociationChainOrder() {
+		$articles = TableRegistry::get('Articles');
+		$articles->belongsTo('Authors');
+		$articles->hasOne('ArticlesTags');
+
+		$articlesTags = TableRegistry::get('ArticlesTags');
+		$articlesTags->belongsTo('Authors', [
+			'foreignKey' => 'tag_id'
+		]);
+
+		$resultA = $articles->find()
+			->contain(['ArticlesTags.Authors', 'Authors'])
+			->first();
+
+		$resultB = $articles->find()
+			->contain(['Authors', 'ArticlesTags.Authors'])
+			->first();
+
+		$this->assertEquals($resultA, $resultB);
+		$this->assertNotEmpty($resultA->author);
+		$this->assertNotEmpty($resultA->articles_tag->author);
+	}
+
+/**
+ * Test that offset/limit are elided from subquery loads.
+ *
+ * @return void
+ */
+	public function testAssociationSubQueryNoOffset() {
+		$table = TableRegistry::get('Articles');
+		$table->addBehavior('Translate', ['fields' => ['title', 'body']]);
+		$table->locale('eng');
+		$query = $table->find('translations')->limit(10)->offset(1);
+		$result = $query->toArray();
+		$this->assertCount(2, $result);
+	}
+
+/**
+ * Tests that using the subquery strategy in a deep assotiatin returns the right results
+ *
+ * @see https://github.com/cakephp/cakephp/issues/4484
+ * @return void
+ */
+	public function testDeepBelongsToManySubqueryStrategy() {
+		$table = TableRegistry::get('Authors');
+		$table->hasMany('Articles');
+		$table->Articles->belongsToMany('Tags', [
+			'strategy' => 'subquery'
+		]);
+		$table->Articles->Tags->junction();
+		$result = $table->find()->contain(['Articles.Tags'])->toArray();
+		$this->assertEquals(
+			['tag1', 'tag3'],
+			collection($result[2]->articles[0]->tags)->extract('name')->toArray()
+		);
+	}
+
+/**
+ * Tests that getting the count of a query having containments return
+ * the correct results
+ *
+ * @see https://github.com/cakephp/cakephp/issues/4511
+ * @return void
+ */
+	public function testCountWithContain() {
+		$table = TableRegistry::get('Articles');
+		$table->belongsTo('Authors', ['joinType' => 'inner']);
+		$count = $table
+			->find()
+			->contain(['Authors' => function ($q) {
+				return $q->where(['Authors.id' => 1]);
+			}])
+			->count();
+		$this->assertEquals(2, $count);
+	}
+
+/**
+ * Test that deep containments don't generate empty entities for
+ * intermediary relations.
+ *
+ * @return void
+ */
+	public function testContainNoEmptyAssociatedObjects() {
+		$comments = TableRegistry::get('Comments');
+		$comments->belongsTo('Users');
+		$users = TableRegistry::get('Users');
+		$users->hasMany('Articles', [
+			'foreignKey' => 'author_id'
+		]);
+
+		$comments->updateAll(['user_id' => 99], ['id' => 1]);
+
+		$result = $comments->find()
+			->contain(['Users'])
+			->where(['Comments.id' => 1])
+			->first();
+		$this->assertNull($result->user, 'No record should be null.');
+
+		$result = $comments->find()
+			->contain(['Users', 'Users.Articles'])
+			->where(['Comments.id' => 1])
+			->first();
+		$this->assertNull($result->user, 'No record should be null.');
 	}
 
 }

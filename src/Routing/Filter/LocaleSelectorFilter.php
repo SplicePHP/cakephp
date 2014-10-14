@@ -36,7 +36,7 @@ class LocaleSelectorFilter extends DispatcherFilter {
  * Constructor.
  *
  * @param array $config Settings for the filter.
- * @throws \Cake\Error\Exception When 'when' conditions are not callable.
+ * @throws \Cake\Core\Exception\Exception When 'when' conditions are not callable.
  */
 	public function __construct($config = []) {
 		parent::__construct($config);
@@ -46,7 +46,7 @@ class LocaleSelectorFilter extends DispatcherFilter {
 	}
 
 /**
- * Inspects the request for the Accept-Langauge header and sets the default
+ * Inspects the request for the Accept-Language header and sets the default
  * Locale for the current runtime if it matches the list of valid locales
  * as passed in the configuration.
  *

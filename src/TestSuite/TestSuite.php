@@ -16,7 +16,7 @@
  */
 namespace Cake\TestSuite;
 
-use Cake\Utility\Folder;
+use Cake\Filesystem\Folder;
 
 /**
  * A class to contain test cases and run them with shared fixtures
@@ -25,7 +25,7 @@ use Cake\Utility\Folder;
 class TestSuite extends \PHPUnit_Framework_TestSuite {
 
 /**
- * Adds all the files in a directory to the test suite. Does not recurse through directories.
+ * Adds all the files in a directory to the test suite. Does not recursive through directories.
  *
  * @param string $directory The directory to add tests from.
  * @return void

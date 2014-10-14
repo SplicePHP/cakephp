@@ -148,10 +148,10 @@ class TestComponent extends Component {
 /**
  * initialize method
  *
- * @param Event $event
+ * @param array $config
  * @return void
  */
-	public function initialize(Event $event) {
+	public function initialize(array $config) {
 	}
 
 /**
@@ -206,8 +206,8 @@ class ControllerTest extends TestCase {
  * @var array
  */
 	public $fixtures = array(
-		'core.post',
-		'core.comment'
+		'core.posts',
+		'core.comments'
 	);
 
 /**
@@ -241,8 +241,18 @@ class ControllerTest extends TestCase {
 		$request = new Request('controller_posts/index');
 		$response = $this->getMock('Cake\Network\Response');
 		$Controller = new Controller($request, $response);
+		$Controller->modelClass = 'SiteArticles';
+
+		$this->assertFalse($Controller->Articles);
+		$this->assertInstanceOf(
+			'Cake\ORM\Table',
+			$Controller->SiteArticles
+		);
+		unset($Controller->SiteArticles);
+
 		$Controller->modelClass = 'Articles';
 
+		$this->assertFalse($Controller->SiteArticles);
 		$this->assertInstanceOf(
 			'TestApp\Model\Table\ArticlesTable',
 			$Controller->Articles
@@ -262,7 +272,10 @@ class ControllerTest extends TestCase {
 		$this->assertFalse(isset($Controller->Articles));
 
 		$result = $Controller->loadModel('Articles');
-		$this->assertTrue($result);
+		$this->assertInstanceOf(
+			'TestApp\Model\Table\ArticlesTable',
+			$result
+		);
 		$this->assertInstanceOf(
 			'TestApp\Model\Table\ArticlesTable',
 			$Controller->Articles
@@ -283,7 +296,10 @@ class ControllerTest extends TestCase {
 		$this->assertFalse(isset($Controller->TestPluginComments));
 
 		$result = $Controller->loadModel('TestPlugin.TestPluginComments');
-		$this->assertTrue($result);
+		$this->assertInstanceOf(
+			'TestPlugin\Model\Table\TestPluginCommentsTable',
+			$result
+		);
 		$this->assertInstanceOf(
 			'TestPlugin\Model\Table\TestPluginCommentsTable',
 			$Controller->TestPluginComments
@@ -323,9 +339,8 @@ class ControllerTest extends TestCase {
 		Plugin::load('TestPlugin');
 
 		$Controller = new TestPluginController(new Request(), new Response());
-		$Controller->components[] = 'TestPlugin.Other';
+		$Controller->loadComponent('TestPlugin.Other');
 
-		$Controller->constructClasses();
 		$this->assertInstanceOf('TestPlugin\Controller\Component\OtherComponent', $Controller->Other);
 	}
 
@@ -497,9 +512,7 @@ class ControllerTest extends TestCase {
  */
 	public function testMergeVars() {
 		$request = new Request();
-
 		$TestController = new TestController($request);
-		$TestController->constructClasses();
 
 		$expected = [
 			'Html' => null,
@@ -514,45 +527,11 @@ class ControllerTest extends TestCase {
 		$this->assertEquals($expected, $TestController->components);
 
 		$TestController = new AnotherTestController($request);
-		$TestController->constructClasses();
-
 		$this->assertEquals(
 			'Posts',
 			$TestController->modelClass,
 			'modelClass should not be overwritten when defined.'
 		);
-	}
-
-/**
- * test that options from child classes replace those in the parent classes.
- *
- * @return void
- */
-	public function testChildComponentOptionsSupercedeParents() {
-		$request = new Request('controller_posts/index');
-
-		$TestController = new TestController($request);
-
-		$expected = array('foo');
-		$TestController->components = array('Cookie' => $expected);
-		$TestController->constructClasses();
-		$this->assertEquals($expected, $TestController->components['Cookie']);
-	}
-
-/**
- * Ensure that _mergeControllerVars is not being greedy and merging with
- * ControllerTestAppController when you make an instance of Controller
- *
- * @return void
- */
-	public function testMergeVarsNotGreedy() {
-		$request = new Request('controller_posts/index');
-
-		$Controller = new Controller($request);
-		$Controller->components = [];
-		$Controller->constructClasses();
-
-		$this->assertFalse(isset($Controller->Session));
 	}
 
 /**
@@ -615,15 +594,15 @@ class ControllerTest extends TestCase {
  * @return void
  */
 	public function testStartupProcess() {
-		$Controller = $this->getMock('Cake\Controller\Controller', array('eventManager'));
-
 		$eventManager = $this->getMock('Cake\Event\EventManager');
+		$controller = new Controller(null, null, null, $eventManager);
+
 		$eventManager->expects($this->at(0))->method('dispatch')
 			->with(
 				$this->logicalAnd(
 					$this->isInstanceOf('Cake\Event\Event'),
 					$this->attributeEqualTo('_name', 'Controller.initialize'),
-					$this->attributeEqualTo('_subject', $Controller)
+					$this->attributeEqualTo('_subject', $controller)
 				)
 			)
 			->will($this->returnValue($this->getMock('Cake\Event\Event', null, [], '', false)));
@@ -633,15 +612,12 @@ class ControllerTest extends TestCase {
 				$this->logicalAnd(
 					$this->isInstanceOf('Cake\Event\Event'),
 					$this->attributeEqualTo('_name', 'Controller.startup'),
-					$this->attributeEqualTo('_subject', $Controller)
+					$this->attributeEqualTo('_subject', $controller)
 				)
 			)
 			->will($this->returnValue($this->getMock('Cake\Event\Event', null, [], '', false)));
 
-		$Controller->expects($this->exactly(2))->method('eventManager')
-			->will($this->returnValue($eventManager));
-
-		$Controller->startupProcess();
+		$controller->startupProcess();
 	}
 
 /**
@@ -650,23 +626,20 @@ class ControllerTest extends TestCase {
  * @return void
  */
 	public function testShutdownProcess() {
-		$Controller = $this->getMock('Cake\Controller\Controller', array('eventManager'));
-
 		$eventManager = $this->getMock('Cake\Event\EventManager');
+		$controller = new Controller(null, null, null, $eventManager);
+
 		$eventManager->expects($this->once())->method('dispatch')
 			->with(
 				$this->logicalAnd(
 					$this->isInstanceOf('Cake\Event\Event'),
 					$this->attributeEqualTo('_name', 'Controller.shutdown'),
-					$this->attributeEqualTo('_subject', $Controller)
+					$this->attributeEqualTo('_subject', $controller)
 				)
 			)
 			->will($this->returnValue($this->getMock('Cake\Event\Event', null, [], '', false)));
 
-		$Controller->expects($this->once())->method('eventManager')
-			->will($this->returnValue($eventManager));
-
-		$Controller->shutdownProcess();
+		$controller->shutdownProcess();
 	}
 
 /**
@@ -681,18 +654,16 @@ class ControllerTest extends TestCase {
 
 		$Controller = new Controller($request, $response);
 		$Controller->request->query['url'] = [];
-		$Controller->constructClasses();
 		$this->assertEquals([], $Controller->paginate);
 
 		$this->assertNotContains('Paginator', $Controller->helpers);
 		$this->assertArrayNotHasKey('Paginator', $Controller->helpers);
 
 		$results = $Controller->paginate('Posts');
-		$this->assertInstanceOf('Cake\ORM\ResultSet', $results);
-		$this->assertContains('Paginator', $Controller->helpers, 'Paginator should be added.');
+		$this->assertInstanceOf('Cake\Datasource\ResultSetInterface', $results);
 
 		$results = $Controller->paginate(TableRegistry::get('Posts'));
-		$this->assertInstanceOf('Cake\ORM\ResultSet', $results);
+		$this->assertInstanceOf('Cake\Datasource\ResultSetInterface', $results);
 
 		$this->assertSame($Controller->request->params['paging']['Posts']['page'], 1);
 		$this->assertSame($Controller->request->params['paging']['Posts']['pageCount'], 1);
@@ -712,18 +683,17 @@ class ControllerTest extends TestCase {
 
 		$Controller = new Controller($request, $response);
 		$Controller->request->query['url'] = [];
-		$Controller->constructClasses();
 		$Controller->modelClass = 'Posts';
 		$results = $Controller->paginate();
 
-		$this->assertInstanceOf('Cake\ORM\ResultSet', $results);
+		$this->assertInstanceOf('Cake\Datasource\ResultSetInterface', $results);
 	}
 
 /**
  * testMissingAction method
  *
- * @expectedException \Cake\Controller\Error\MissingActionException
- * @expectedExceptionMessage Action TestController::missing() could not be found.
+ * @expectedException \Cake\Controller\Exception\MissingActionException
+ * @expectedExceptionMessage Action TestController::missing() could not be found, or is not accessible.
  * @return void
  */
 	public function testInvokeActionMissingAction() {
@@ -738,8 +708,8 @@ class ControllerTest extends TestCase {
 /**
  * test invoking private methods.
  *
- * @expectedException \Cake\Controller\Error\PrivateActionException
- * @expectedExceptionMessage Private Action TestController::private_m() is not directly accessible.
+ * @expectedException \Cake\Controller\Exception\MissingActionException
+ * @expectedExceptionMessage Action TestController::private_m() could not be found, or is not accessible.
  * @return void
  */
 	public function testInvokeActionPrivate() {
@@ -754,8 +724,8 @@ class ControllerTest extends TestCase {
 /**
  * test invoking protected methods.
  *
- * @expectedException \Cake\Controller\Error\PrivateActionException
- * @expectedExceptionMessage Private Action TestController::protected_m() is not directly accessible.
+ * @expectedException \Cake\Controller\Exception\MissingActionException
+ * @expectedExceptionMessage Action TestController::protected_m() could not be found, or is not accessible.
  * @return void
  */
 	public function testInvokeActionProtected() {
@@ -768,26 +738,10 @@ class ControllerTest extends TestCase {
 	}
 
 /**
- * test invoking hidden methods.
- *
- * @expectedException \Cake\Controller\Error\PrivateActionException
- * @expectedExceptionMessage Private Action TestController::_hidden() is not directly accessible.
- * @return void
- */
-	public function testInvokeActionHidden() {
-		$url = new Request('test/_hidden/');
-		$url->addParams(array('controller' => 'test_controller', 'action' => '_hidden'));
-		$response = $this->getMock('Cake\Network\Response');
-
-		$Controller = new TestController($url, $response);
-		$Controller->invokeAction();
-	}
-
-/**
  * test invoking controller methods.
  *
- * @expectedException \Cake\Controller\Error\PrivateActionException
- * @expectedExceptionMessage Private Action TestController::redirect() is not directly accessible.
+ * @expectedException \Cake\Controller\Exception\MissingActionException
+ * @expectedExceptionMessage Action TestController::redirect() could not be found, or is not accessible.
  * @return void
  */
 	public function testInvokeActionBaseMethods() {
@@ -858,17 +812,52 @@ class ControllerTest extends TestCase {
  *
  * @return void
  */
-	public function testAddComponent() {
+	public function testLoadComponent() {
 		$request = new Request('/');
 		$response = $this->getMock('Cake\Network\Response');
 
 		$controller = new TestController($request, $response);
-		$result = $controller->addComponent('Paginator');
+		$result = $controller->loadComponent('Paginator');
 		$this->assertInstanceOf('Cake\Controller\Component\PaginatorComponent', $result);
 		$this->assertSame($result, $controller->Paginator);
 
 		$registry = $controller->components();
 		$this->assertTrue(isset($registry->Paginator));
+	}
+
+/**
+ * Test adding a component that is a duplicate.
+ *
+ * @return void
+ */
+	public function testLoadComponentDuplicate() {
+		$request = new Request('/');
+		$response = $this->getMock('Cake\Network\Response');
+
+		$controller = new TestController($request, $response);
+		$this->assertNotEmpty($controller->loadComponent('Paginator'));
+		$this->assertNotEmpty($controller->loadComponent('Paginator'));
+		try {
+			$controller->loadComponent('Paginator', ['bad' => 'settings']);
+			$this->fail('No exception');
+		} catch (\RuntimeException $e) {
+			$this->assertContains('The "Paginator" alias has already been loaded', $e->getMessage());
+		}
+	}
+
+/**
+ * Test the isAction method.
+ *
+ * @return void
+ */
+	public function testIsAction() {
+		$request = new Request('/');
+		$response = $this->getMock('Cake\Network\Response');
+		$controller = new TestController($request, $response);
+
+		$this->assertFalse($controller->isAction('redirect'));
+		$this->assertFalse($controller->isAction('beforeFilter'));
+		$this->assertTrue($controller->isAction('index'));
 	}
 
 }

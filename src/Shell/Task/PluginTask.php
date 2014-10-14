@@ -14,11 +14,11 @@
  */
 namespace Cake\Shell\Task;
 
-use Cake\Shell\Task\BakeTask;
 use Cake\Console\Shell;
 use Cake\Core\App;
-use Cake\Utility\File;
-use Cake\Utility\Folder;
+use Cake\Filesystem\File;
+use Cake\Filesystem\Folder;
+use Cake\Shell\Task\BakeTask;
 
 /**
  * The Plugin Task handles creating an empty plugin, ready to be used
@@ -59,7 +59,7 @@ class PluginTask extends BakeTask {
 	public function main($name = null) {
 		if (empty($name)) {
 			$this->err('<error>You must provide a plugin name in CamelCase format.</error>');
-			$this->err('To make an "Example" plugin, run <info>Console/cake bake plugin Example</info>.');
+			$this->err('To make an "Example" plugin, run <info>`cake bake plugin Example`</info>.');
 			return false;
 		}
 		$plugin = $this->_camelize($name);
@@ -138,6 +138,8 @@ class PluginTask extends BakeTask {
 			$out .= "class AppController extends BaseController {\n\n";
 			$out .= "}\n";
 			$this->createFile($this->path . $plugin . DS . $classBase . DS . 'Controller' . DS . $controllerFileName, $out);
+			$emptyFile = $this->path . 'empty';
+			$this->_deleteEmptyFile($emptyFile);
 
 			$hasAutoloader = $this->_modifyAutoloader($plugin, $this->path);
 			$this->_generateRoutes($plugin, $this->path);
@@ -296,7 +298,7 @@ class PluginTask extends BakeTask {
 			}
 			$prompt = 'Choose a plugin path from the paths above.';
 			$choice = $this->in($prompt, null, 1);
-			if (intval($choice) > 0 && intval($choice) <= $max) {
+			if ((int)$choice > 0 && (int)$choice <= $max) {
 				$valid = true;
 			}
 		}

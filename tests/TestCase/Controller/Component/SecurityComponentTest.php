@@ -141,12 +141,11 @@ class SecurityComponentTest extends TestCase {
 			->will($this->returnValue('/articles/index'));
 
 		$this->Controller = new SecurityTestController($request);
-		$this->Controller->constructClasses();
 		$this->Controller->Security = $this->Controller->TestSecurity;
 		$this->Controller->Security->config('blackHoleCallback', 'fail');
 		$this->Security = $this->Controller->Security;
 		$this->Security->session = $session;
-		Configure::write('Security.salt', 'foo!');
+		Security::salt('foo!');
 	}
 
 /**
@@ -166,7 +165,7 @@ class SecurityComponentTest extends TestCase {
  * Test that requests are still blackholed when controller has incorrect
  * visibility keyword in the blackhole callback
  *
- * @expectedException \Cake\Error\BadRequestException
+ * @expectedException \Cake\Network\Exception\BadRequestException
  * @return void
  */
 	public function testBlackholeWithBrokenCallback() {
@@ -236,8 +235,8 @@ class SecurityComponentTest extends TestCase {
 	public function testRequireSecureFail() {
 		$_SERVER['HTTPS'] = 'off';
 		$_SERVER['REQUEST_METHOD'] = 'POST';
-		$event = new Event('Controller.startup', $this->Controller);
 		$this->Controller->request['action'] = 'posted';
+		$event = new Event('Controller.startup', $this->Controller);
 		$this->Controller->Security->requireSecure(array('posted'));
 		$this->Controller->Security->startup($event);
 		$this->assertTrue($this->Controller->failed);
@@ -249,11 +248,41 @@ class SecurityComponentTest extends TestCase {
  * @return void
  */
 	public function testRequireSecureSucceed() {
+		$_SERVER['HTTPS'] = 'on';
 		$_SERVER['REQUEST_METHOD'] = 'Secure';
 		$this->Controller->request['action'] = 'posted';
-		$_SERVER['HTTPS'] = 'on';
 		$event = new Event('Controller.startup', $this->Controller);
 		$this->Controller->Security->requireSecure('posted');
+		$this->Controller->Security->startup($event);
+		$this->assertFalse($this->Controller->failed);
+	}
+
+/**
+ * testRequireSecureEmptyFail method
+ *
+ * @return void
+ */
+	public function testRequireSecureEmptyFail() {
+		$_SERVER['HTTPS'] = 'off';
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$this->Controller->request['action'] = 'posted';
+		$event = new Event('Controller.startup', $this->Controller);
+		$this->Controller->Security->requireSecure();
+		$this->Controller->Security->startup($event);
+		$this->assertTrue($this->Controller->failed);
+	}
+
+/**
+ * testRequireSecureEmptySucceed method
+ *
+ * @return void
+ */
+	public function testRequireSecureEmptySucceed() {
+		$_SERVER['HTTPS'] = 'on';
+		$_SERVER['REQUEST_METHOD'] = 'Secure';
+		$this->Controller->request['action'] = 'posted';
+		$event = new Event('Controller.startup', $this->Controller);
+		$this->Controller->Security->requireSecure();
 		$this->Controller->Security->startup($event);
 		$this->assertFalse($this->Controller->failed);
 	}
@@ -629,7 +658,7 @@ class SecurityComponentTest extends TestCase {
 		$this->Controller->Security->startup($event);
 		$unlocked = 'Model.username';
 		$fields = array('Model.hidden', 'Model.password');
-		$fields = urlencode(Security::hash('/articles/index' . serialize($fields) . $unlocked . Configure::read('Security.salt')));
+		$fields = urlencode(Security::hash('/articles/index' . serialize($fields) . $unlocked . Security::salt()));
 
 		$this->Controller->request->data = array(
 			'Model' => array(
@@ -653,7 +682,7 @@ class SecurityComponentTest extends TestCase {
 		$event = new Event('Controller.startup', $this->Controller);
 		$this->Controller->Security->startup($event);
 		$fields = array('Model.hidden', 'Model.password', 'Model.username');
-		$fields = urlencode(Security::hash(serialize($fields) . Configure::read('Security.salt')));
+		$fields = urlencode(Security::hash(serialize($fields) . Security::salt()));
 
 		$this->Controller->request->data = array(
 			'Model' => array(
@@ -678,7 +707,7 @@ class SecurityComponentTest extends TestCase {
 		$this->Controller->Security->startup($event);
 		$unlocked = 'Model.username';
 		$fields = array('Model.hidden', 'Model.password');
-		$fields = urlencode(Security::hash(serialize($fields) . $unlocked . Configure::read('Security.salt')));
+		$fields = urlencode(Security::hash(serialize($fields) . $unlocked . Security::salt()));
 
 		// Tamper the values.
 		$unlocked = 'Model.username|Model.password';
@@ -799,7 +828,7 @@ class SecurityComponentTest extends TestCase {
 		$this->Controller->Security->startup($event);
 		$unlocked = '';
 		$hashFields = array('TaxonomyData');
-		$fields = urlencode(Security::hash('/articles/index' . serialize($hashFields) . $unlocked . Configure::read('Security.salt')));
+		$fields = urlencode(Security::hash('/articles/index' . serialize($hashFields) . $unlocked . Security::salt()));
 
 		$this->Controller->request->data = array(
 			'TaxonomyData' => array(

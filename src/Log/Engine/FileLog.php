@@ -16,6 +16,7 @@ namespace Cake\Log\Engine;
 
 use Cake\Core\Configure;
 use Cake\Log\Engine\BaseLog;
+use Cake\Utility\String;
 
 /**
  * File Storage stream for Logging. Writes logs to different files
@@ -34,7 +35,7 @@ class FileLog extends BaseLog {
  * - `size` Used to implement basic log file rotation. If log file size
  *   reaches specified size the existing file is renamed by appending timestamp
  *   to filename and new log file is created. Can be integer bytes value or
- *   human reabable string values like '10MB', '100KB' etc.
+ *   human readable string values like '10MB', '100KB' etc.
  * - `rotate` Log files are rotated specified times before being removed.
  *   If value is 0, old versions are removed rather then rotated.
  * - `mask` A mask is applied when log files are created. Left empty no chmod
@@ -100,7 +101,7 @@ class FileLog extends BaseLog {
 			if (is_numeric($this->_config['size'])) {
 				$this->_size = (int)$this->_config['size'];
 			} else {
-				$this->_size = CakeNumber::fromReadableSize($this->_config['size']);
+				$this->_size = String::parseFileSize($this->_config['size']);
 			}
 		}
 	}
@@ -111,11 +112,11 @@ class FileLog extends BaseLog {
  * @param string $level The severity level of the message being written.
  *    See Cake\Log\Log::$_levels for list of possible levels.
  * @param string $message The message you want to log.
- * @param string|array $scope The scope(s) a log message is being created in.
- *    See Cake\Log\Log::config() for more information on logging scopes.
+ * @param array $context Additional information about the logged message
  * @return bool success of write.
  */
-	public function write($level, $message, $scope = []) {
+	public function log($level, $message, array $context = []) {
+		$message = $this->_format($message, $context);
 		$output = date('Y-m-d H:i:s') . ' ' . ucfirst($level) . ': ' . $message . "\n";
 		$filename = $this->_getFilename($level);
 		if (!empty($this->_size)) {
@@ -131,6 +132,7 @@ class FileLog extends BaseLog {
 		$exists = file_exists($pathname);
 		$result = file_put_contents($pathname, $output, FILE_APPEND);
 		static $selfError = false;
+
 		if (!$selfError && !$exists && !chmod($pathname, (int)$mask)) {
 			$selfError = true;
 			trigger_error(vsprintf(
@@ -138,6 +140,7 @@ class FileLog extends BaseLog {
 				array($mask, $pathname)), E_USER_WARNING);
 			$selfError = false;
 		}
+
 		return $result;
 	}
 

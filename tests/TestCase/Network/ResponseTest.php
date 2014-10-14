@@ -31,7 +31,7 @@ class ResponseTest extends TestCase {
  */
 	public function setUp() {
 		parent::setUp();
-		ob_start();
+		include_once __DIR__ . DS . 'mocks.php';
 	}
 
 /**
@@ -41,7 +41,6 @@ class ResponseTest extends TestCase {
  */
 	public function tearDown() {
 		parent::tearDown();
-		ob_end_clean();
 	}
 
 /**
@@ -113,7 +112,7 @@ class ResponseTest extends TestCase {
 /**
  * Tests the statusCode method
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException InvalidArgumentException
  * @return void
  */
 	public function testStatusCode() {
@@ -398,7 +397,7 @@ class ResponseTest extends TestCase {
 /**
  * Tests the httpCodes method
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException InvalidArgumentException
  * @return void
  */
 	public function testHttpCodes() {
@@ -1158,7 +1157,7 @@ class ResponseTest extends TestCase {
 /**
  * testFileNotFound
  *
- * @expectedException \Cake\Error\NotFoundException
+ * @expectedException Cake\Network\Exception\NotFoundException
  * @return void
  */
 	public function testFileNotFound() {
@@ -1169,7 +1168,7 @@ class ResponseTest extends TestCase {
 /**
  * test file with ..
  *
- * @expectedException Cake\Error\NotFoundException
+ * @expectedException Cake\Network\Exception\NotFoundException
  * @return void
  */
 	public function testFileWithPathTraversal() {

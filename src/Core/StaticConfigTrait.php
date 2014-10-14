@@ -14,7 +14,7 @@
  */
 namespace Cake\Core;
 
-use Cake\Error\Exception;
+use BadMethodCallException;
 
 /**
  * A trait that provides a set of static methods to manage configuration
@@ -33,7 +33,7 @@ trait StaticConfigTrait {
 	protected static $_config = [];
 
 /**
- * This method can be used to define confguration adapters for an application
+ * This method can be used to define configuration adapters for an application
  * or read existing configuration.
  *
  * To change an adapter's configuration at runtime, first drop the adapter and then
@@ -65,7 +65,7 @@ trait StaticConfigTrait {
  * @param string|array $key The name of the configuration, or an array of multiple configs.
  * @param array $config An array of name => configuration data for adapter.
  * @return mixed null when adding configuration and an array of configuration data when reading.
- * @throws \Cake\Error\Exception When trying to modify an existing config.
+ * @throws \BadMethodCallException When trying to modify an existing config.
  */
 	public static function config($key, $config = null) {
 		// Read config.
@@ -79,7 +79,7 @@ trait StaticConfigTrait {
 			return;
 		}
 		if (isset(static::$_config[$key])) {
-			throw new Exception(sprintf('Cannot reconfigure existing key "%s"', $key));
+			throw new BadMethodCallException(sprintf('Cannot reconfigure existing key "%s"', $key));
 		}
 		if (is_object($config)) {
 			$config = ['className' => $config];
@@ -100,14 +100,14 @@ trait StaticConfigTrait {
  * If the implementing objects supports a `$_registry` object the named configuration
  * will also be unloaded from the registry.
  *
- * @param string $config An existing configuation you wish to remove.
+ * @param string $config An existing configuration you wish to remove.
  * @return bool success of the removal, returns false when the config does not exist.
  */
 	public static function drop($config) {
 		if (!isset(static::$_config[$config])) {
 			return false;
 		}
-		if (isset(static::$_registry) && isset(static::$_registry->{$config})) {
+		if (isset(static::$_registry)) {
 			static::$_registry->unload($config);
 		}
 		unset(static::$_config[$config]);

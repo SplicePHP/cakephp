@@ -14,12 +14,12 @@
  */
 namespace Cake\ORM;
 
+use BadMethodCallException;
 use Cake\Core\App;
 use Cake\Database\Schema\Table as Schema;
 use Cake\Database\Type;
 use Cake\Datasource\EntityInterface;
 use Cake\Datasource\RepositoryInterface;
-use Cake\Event\Event;
 use Cake\Event\EventListener;
 use Cake\Event\EventManager;
 use Cake\Event\EventManagerTrait;
@@ -29,11 +29,12 @@ use Cake\ORM\Association\BelongsToMany;
 use Cake\ORM\Association\HasMany;
 use Cake\ORM\Association\HasOne;
 use Cake\ORM\BehaviorRegistry;
-use Cake\ORM\Error\MissingEntityException;
-use Cake\ORM\Error\RecordNotFoundException;
+use Cake\ORM\Exception\MissingEntityException;
+use Cake\ORM\Exception\RecordNotFoundException;
 use Cake\ORM\Marshaller;
 use Cake\Utility\Inflector;
 use Cake\Validation\Validator;
+use RuntimeException;
 
 /**
  * Represents a single database table.
@@ -74,19 +75,33 @@ use Cake\Validation\Validator;
  * Table objects provide a few callbacks/events you can hook into to augment/replace
  * find operations. Each event uses the standard event subsystem in CakePHP
  *
- * - `beforeFind($event, $query, $options, $eagerLoaded)` - Fired before each find operation.
- *   By stopping the event and supplying a return value you can bypass the find operation
- *   entirely. Any changes done to the $query instance will be retained for the rest of the find.
- * - `beforeValidate($event, $entity, $options, $validator)` - Fired before an entity is validated.
- *   By stopping this event, you can abort the validate + save operations.
- * - `afterValidate($event, $entity, $options, $validator)` - Fired after an entity is validated.
- * - `beforeSave($event, $entity, $options)` - Fired before each entity is saved. Stopping this
- *   event will abort the save operation. When the event is stopped the result of the event will
- *   be returned.
- * - `afterSave($event, $entity, $options)` - Fired after an entity is saved.
- * - `beforeDelete($event, $entity, $options)` - Fired before an entity is deleted.
- *   By stopping this event you will abort the delete operation.
- * - `afterDelete($event, $entity, $options)` - Fired after an entity has been deleted.
+ * - `beforeFind(Event $event, Query $query, ArrayObject $options, boolean $primary)`
+ *   Fired before each find operation. By stopping the event and supplying a
+ *   return value you can bypass the find operation entirely. Any changes done
+ *   to the $query instance will be retained for the rest of the find. The
+ *   $primary parameter indicates whether or not this is the root query,
+ *   or an associated query.
+ *
+ * - `beforeValidate(Event $event, Entity $entity, ArrayObject $options, Validator $validator)`
+ *   Fired before an entity is validated. By stopping this event, you can abort
+ *   the validate + save operations.
+ *
+ * - `afterValidate(Event $event, Entity $entity, ArrayObject $options, Validator $validator)`
+ *   Fired after an entity is validated.
+ *
+ * - `beforeSave(Event $event, Entity $entity, ArrayObject $options)`
+ *   Fired before each entity is saved. Stopping this event will abort the save
+ *   operation. When the event is stopped the result of the event will be returned.
+ *
+ * - `afterSave(Event $event, Entity $entity, ArrayObject $options)`
+ *   Fired after an entity is saved.
+ *
+ * - `beforeDelete(Event $event, Entity $entity, ArrayObject $options)`
+ *   Fired before an entity is deleted. By stopping this event you will abort
+ *   the delete operation.
+ *
+ * - `afterDelete(Event $event, Entity $entity, ArrayObject $options)`
+ *   Fired after an entity has been deleted.
  *
  * @see \Cake\Event\EventManager for reference on the events system.
  */
@@ -215,6 +230,7 @@ class Table implements RepositoryInterface, EventListener {
 
 		$this->initialize($config);
 		$this->_eventManager->attach($this);
+		$this->dispatchEvent('Model.initialize');
 	}
 
 /**
@@ -431,7 +447,7 @@ class Table implements RepositoryInterface, EventListener {
  * a new one
  *
  * @param string $name the name of the class to use
- * @throws \Cake\ORM\Error\MissingEntityException when the entity class cannot be found
+ * @throws \Cake\ORM\Exception\MissingEntityException when the entity class cannot be found
  * @return string
  */
 	public function entityClass($name = null) {
@@ -484,6 +500,7 @@ class Table implements RepositoryInterface, EventListener {
  * @param string $name The name of the behavior. Can be a short class reference.
  * @param array $options The options for the behavior to use.
  * @return void
+ * @throws \RuntimeException If a behavior is being reloaded.
  * @see \Cake\ORM\Behavior
  */
 	public function addBehavior($name, array $options = []) {
@@ -805,7 +822,7 @@ class Table implements RepositoryInterface, EventListener {
 			['idField', 'valueField', 'groupField']
 		);
 
-		return $query->formatResults(function($results) use ($options) {
+		return $query->formatResults(function ($results) use ($options) {
 			return $results->combine(
 				$options['idField'],
 				$options['valueField'],
@@ -844,7 +861,7 @@ class Table implements RepositoryInterface, EventListener {
 		];
 		$options = $this->_setFieldMatchers($options, ['idField', 'parentField']);
 
-		return $query->formatResults(function($results) use ($options) {
+		return $query->formatResults(function ($results) use ($options) {
 			return $results->nest($options['idField'], $options['parentField']);
 		});
 	}
@@ -874,7 +891,7 @@ class Table implements RepositoryInterface, EventListener {
 			}
 
 			$fields = $options[$field];
-			$options[$field] = function($row) use ($fields) {
+			$options[$field] = function ($row) use ($fields) {
 				$matches = [];
 				foreach ($fields as $field) {
 					$matches[] = $row[$field];
@@ -889,7 +906,7 @@ class Table implements RepositoryInterface, EventListener {
 /**
  * {@inheritDoc}
  *
- * @throws \Cake\ORM\Error\RecordNotFoundException if no record can be found given
+ * @throws \Cake\ORM\Exception\RecordNotFoundException if no record can be found given
  * a primary key value.
  * @throws \InvalidArgumentException When $primaryKey has an incorrect number of elements.
  */
@@ -908,7 +925,24 @@ class Table implements RepositoryInterface, EventListener {
 			));
 		}
 		$conditions = array_combine($key, $primaryKey);
-		$entity = $this->find('all', $options)->where($conditions)->first();
+
+		$cacheConfig = isset($options['cache']) ? $options['cache'] : false;
+		$cacheKey = isset($options['key']) ? $options['key'] : false;
+		unset($options['key'], $options['cache']);
+
+		$query = $this->find('all', $options)->where($conditions);
+
+		if ($cacheConfig) {
+			if (!$cacheKey) {
+				$cacheKey = sprintf(
+					"get:%s.%s%s",
+					$this->connection()->configName(), $this->table(), json_encode($primaryKey)
+				);
+			}
+			$query->cache($cacheKey, $cacheConfig);
+		}
+
+		$entity = $query->first();
 
 		if ($entity) {
 			return $entity;
@@ -918,6 +952,34 @@ class Table implements RepositoryInterface, EventListener {
 			implode(',', (array)$primaryKey),
 			$this->table()
 		));
+	}
+
+/**
+ * Finds an existing record or creates a new one.
+ *
+ * Using the attributes defined in $search a find() will be done to locate
+ * an existing record. If that record exists it will be returned. If it does
+ * not exist, a new entity will be created with the $search properties, and
+ * the $defaults. When a new entity is created, it will be saved.
+ *
+ * @param array $search The criteria to find existing records by.
+ * @param callable $callback A callback that will be invoked for newly
+ *   created entities. This callback will be called *before* the entity
+ *   is persisted.
+ * @return \Cake\Datasource\EntityInterface An entity.
+ */
+	public function findOrCreate($search, callable $callback = null) {
+		$query = $this->find()->where($search);
+		$row = $query->first();
+		if ($row) {
+			return $row;
+		}
+		$entity = $this->newEntity();
+		$entity->set($search, ['guard' => false]);
+		if ($callback) {
+			$callback($entity);
+		}
+		return $this->save($entity) ?: $entity;
 	}
 
 /**
@@ -1126,7 +1188,7 @@ class Table implements RepositoryInterface, EventListener {
 
 		if ($options['atomic']) {
 			$connection = $this->connection();
-			$success = $connection->transactional(function() use ($entity, $options) {
+			$success = $connection->transactional(function () use ($entity, $options) {
 				return $this->_processSave($entity, $options);
 			});
 		} else {
@@ -1156,17 +1218,13 @@ class Table implements RepositoryInterface, EventListener {
 			$entity->isNew(!$this->exists($conditions));
 		}
 
-		$associated = $options['associated'];
-		$options['associated'] = [];
+		$options['associated'] = $this->_associations->normalizeKeys($options['associated']);
 		$validate = $options['validate'];
 
 		if ($validate && !$this->validate($entity, $options)) {
 			return false;
 		}
-
-		$options['associated'] = $this->_associations->normalizeKeys($associated);
-		$event = new Event('Model.beforeSave', $this, compact('entity', 'options'));
-		$this->eventManager()->dispatch($event);
+		$event = $this->dispatchEvent('Model.beforeSave', compact('entity', 'options'));
 
 		if ($event->isStopped()) {
 			return $event->result;
@@ -1176,7 +1234,7 @@ class Table implements RepositoryInterface, EventListener {
 			$this,
 			$entity,
 			$options['associated'],
-			['validate' => (bool)$validate] + $options->getArrayCopy()
+			['validate' => false] + $options->getArrayCopy()
 		);
 
 		if (!$saved && $options['atomic']) {
@@ -1202,8 +1260,7 @@ class Table implements RepositoryInterface, EventListener {
 			);
 			if ($success || !$options['atomic']) {
 				$entity->clean();
-				$event = new Event('Model.afterSave', $this, compact('entity', 'options'));
-				$this->eventManager()->dispatch($event);
+				$this->dispatchEvent('Model.afterSave', compact('entity', 'options'));
 				$entity->isNew(false);
 				$entity->source($this->alias());
 				$success = true;
@@ -1364,7 +1421,7 @@ class Table implements RepositoryInterface, EventListener {
 	public function delete(EntityInterface $entity, $options = []) {
 		$options = new \ArrayObject($options + ['atomic' => true]);
 
-		$process = function() use ($entity, $options) {
+		$process = function () use ($entity, $options) {
 			return $this->_processDelete($entity, $options);
 		};
 
@@ -1387,12 +1444,10 @@ class Table implements RepositoryInterface, EventListener {
  * @return bool success
  */
 	protected function _processDelete($entity, $options) {
-		$eventManager = $this->eventManager();
-		$event = new Event('Model.beforeDelete', $this, [
+		$event = $this->dispatchEvent('Model.beforeDelete', [
 			'entity' => $entity,
 			'options' => $options
 		]);
-		$eventManager->dispatch($event);
 		if ($event->isStopped()) {
 			return $event->result;
 		}
@@ -1419,11 +1474,10 @@ class Table implements RepositoryInterface, EventListener {
 			return $success;
 		}
 
-		$event = new Event('Model.afterDelete', $this, [
+		$this->dispatchEvent('Model.afterDelete', [
 			'entity' => $entity,
 			'options' => $options
 		]);
-		$eventManager->dispatch($event);
 
 		return $success;
 	}
@@ -1441,7 +1495,7 @@ class Table implements RepositoryInterface, EventListener {
 	public function callFinder($type, Query $query, array $options = []) {
 		$query->applyOptions($options);
 		$options = $query->getOptions();
-		$finder = 'find' . ucfirst($type);
+		$finder = 'find' . $type;
 		if (method_exists($this, $finder)) {
 			return $this->{$finder}($query, $options);
 		}
@@ -1461,7 +1515,7 @@ class Table implements RepositoryInterface, EventListener {
  * @param string $method The method name that was fired.
  * @param array $args List of arguments passed to the function.
  * @return mixed
- * @throws \Cake\Error\Exception when there are missing arguments, or when
+ * @throws \BadMethodCallException when there are missing arguments, or when
  *  and & or are combined.
  */
 	protected function _dynamicFinder($method, $args) {
@@ -1479,10 +1533,10 @@ class Table implements RepositoryInterface, EventListener {
 		$hasOr = strpos($fields, '_or_');
 		$hasAnd = strpos($fields, '_and_');
 
-		$makeConditions = function($fields, $args) {
+		$makeConditions = function ($fields, $args) {
 			$conditions = [];
 			if (count($args) < count($fields)) {
-				throw new \Cake\Error\Exception(sprintf(
+				throw new BadMethodCallException(sprintf(
 					'Not enough arguments to magic finder. Got %s required %s',
 					count($args),
 					count($fields)
@@ -1495,7 +1549,7 @@ class Table implements RepositoryInterface, EventListener {
 		};
 
 		if ($hasOr !== false && $hasAnd !== false) {
-			throw new \Cake\Error\Exception(
+			throw new BadMethodCallException(
 				'Cannot mix "and" & "or" in a magic finder. Use find() instead.'
 			);
 		}
@@ -1605,7 +1659,7 @@ class Table implements RepositoryInterface, EventListener {
  * using the options parameter:
  *
  * {{{
- * $articles = $this->Articles->newEntity(
+ * $article = $this->Articles->newEntity(
  *   $this->request->data(),
  *   ['associated' => ['Tags', 'Comments.Users']]
  * );
@@ -1615,13 +1669,23 @@ class Table implements RepositoryInterface, EventListener {
  * passing the `fieldList` option, which is also accepted for associations:
  *
  * {{{
- * $articles = $this->Articles->newEntity($this->request->data(), [
- *	'fieldList' => ['title', 'body'],
- *	'associated' => ['Tags', 'Comments.Users' => ['fieldList' => 'username']]
- *	]
+ * $article = $this->Articles->newEntity($this->request->data(), [
+ *  'fieldList' => ['title', 'body'],
+ *  'associated' => ['Tags', 'Comments.Users' => ['fieldList' => 'username']]
+ * ]
  * );
  * }}}
  *
+ * The `fieldList` option lets remove or restrict input data from ending up in
+ * the entity. If you'd like to relax the entity's default accessible fields,
+ * you can use the `accessibleFields` option:
+ *
+ * {{{
+ * $article = $this->Articles->newEntity(
+ *   $this->request->data(),
+ *   ['accessibleFields' => ['protected_field' => true]]
+ * );
+ * }}}
  */
 	public function newEntity(array $data = [], array $options = []) {
 		if (!isset($options['associated'])) {

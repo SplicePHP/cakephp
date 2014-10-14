@@ -14,8 +14,6 @@
  */
 namespace Cake\Test\TestCase\Shell\Task;
 
-use Cake\Shell\Task\TemplateTask;
-use Cake\Shell\Task\TestTask;
 use Cake\Controller\Controller;
 use Cake\Core\App;
 use Cake\Core\Configure;
@@ -24,9 +22,12 @@ use Cake\Network\Request;
 use Cake\Network\Response;
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
+use Cake\Shell\Task\TemplateTask;
+use Cake\Shell\Task\TestTask;
 use Cake\TestSuite\TestCase;
 use TestApp\Controller\PostsController;
 use TestApp\Model\Table\ArticlesTable;
+use TestApp\Model\Table\CategoryThreadsTable;
 
 /**
  * TestTaskTest class
@@ -39,8 +40,13 @@ class TestTaskTest extends TestCase {
  *
  * @var string
  */
-	public $fixtures = ['core.article', 'core.author',
-		'core.comment', 'core.articles_tag', 'core.tag'];
+	public $fixtures = [
+		'core.articles',
+		'core.authors',
+		'core.comments',
+		'core.tags',
+		'core.articles_tags',
+	];
 
 /**
  * setUp method
@@ -213,10 +219,25 @@ class TestTaskTest extends TestCase {
 		$subject = new ArticlesTable();
 		$result = $this->Task->generateFixtureList($subject);
 		$expected = [
-			'app.article',
-			'app.author',
-			'app.tag',
-			'app.articles_tag'
+			'app.articles',
+			'app.authors',
+			'app.tags',
+			'app.articles_tags'
+		];
+		$this->assertEquals($expected, $result);
+	}
+
+/**
+ * test that the generation of fixtures works correctly.
+ *
+ * @return void
+ */
+	public function testFixtureArrayGenerationIgnoreSelfAssociation() {
+		TableRegistry::clear();
+		$subject = new CategoryThreadsTable();
+		$result = $this->Task->generateFixtureList($subject);
+		$expected = [
+			'app.category_threads',
 		];
 		$this->assertEquals($expected, $result);
 	}
@@ -230,7 +251,7 @@ class TestTaskTest extends TestCase {
 		$subject = new PostsController(new Request(), new Response());
 		$result = $this->Task->generateFixtureList($subject);
 		$expected = [
-			'app.post',
+			'app.posts',
 		];
 		$this->assertEquals($expected, $result);
 	}
@@ -295,13 +316,13 @@ class TestTaskTest extends TestCase {
 			->method('createFile')
 			->will($this->returnValue(true));
 
-		$this->Task->params['fixtures'] = 'app.post, app.comments , app.user ,';
+		$this->Task->params['fixtures'] = 'app.posts, app.comments , app.users ,';
 		$result = $this->Task->bake('Table', 'Articles');
 
 		$this->assertContains('public $fixtures = [', $result);
-		$this->assertContains('app.post', $result);
+		$this->assertContains('app.posts', $result);
 		$this->assertContains('app.comments', $result);
-		$this->assertContains('app.user', $result);
+		$this->assertContains('app.users', $result);
 		$this->assertNotContains("''", $result);
 	}
 
@@ -364,16 +385,15 @@ class TestTaskTest extends TestCase {
 		$result = $this->Task->bake('Controller', 'PostsController');
 
 		$this->assertContains("use TestApp\Controller\PostsController", $result);
-		$this->assertContains('class PostsControllerTest extends ControllerTestCase', $result);
+		$this->assertContains('class PostsControllerTest extends IntegrationTestCase', $result);
 
 		$this->assertNotContains('function setUp()', $result);
 		$this->assertNotContains("\$this->Posts = new PostsController()", $result);
-		$this->assertNotContains("\$this->Posts->constructClasses()", $result);
 
 		$this->assertNotContains('function tearDown()', $result);
 		$this->assertNotContains('unset($this->Posts)', $result);
 
-		$this->assertContains("'app.post'", $result);
+		$this->assertContains("'app.posts'", $result);
 	}
 
 /**
@@ -392,11 +412,10 @@ class TestTaskTest extends TestCase {
 		$result = $this->Task->bake('controller', 'Admin\Posts');
 
 		$this->assertContains("use TestApp\Controller\Admin\PostsController", $result);
-		$this->assertContains('class PostsControllerTest extends ControllerTestCase', $result);
+		$this->assertContains('class PostsControllerTest extends IntegrationTestCase', $result);
 
 		$this->assertNotContains('function setUp()', $result);
 		$this->assertNotContains("\$this->Posts = new PostsController()", $result);
-		$this->assertNotContains("\$this->Posts->constructClasses()", $result);
 
 		$this->assertNotContains('function tearDown()', $result);
 		$this->assertNotContains('unset($this->Posts)', $result);

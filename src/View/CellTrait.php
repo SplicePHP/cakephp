@@ -16,6 +16,7 @@ namespace Cake\View;
 
 use Cake\Core\App;
 use Cake\Utility\Inflector;
+use Cake\View\View;
 
 /**
  * Provides cell() method for usage in Controller and View classes.
@@ -51,7 +52,7 @@ trait CellTrait {
  *    `cell('TagCloud::smallList', ['a1' => 'v1', 'a2' => 'v2'])` maps to `View\Cell\TagCloud::smallList(v1, v2)`
  * @param array $options Options for Cell's constructor
  * @return \Cake\View\Cell The cell instance
- * @throws \Cake\View\Error\MissingCellException If Cell class was not found.
+ * @throws \Cake\View\Exception\MissingCellException If Cell class was not found.
  * @throws \BadMethodCallException If Cell class does not specified cell action.
  */
 	public function cell($cell, array $data = [], array $options = []) {
@@ -64,27 +65,21 @@ trait CellTrait {
 		}
 
 		list($plugin, $cellName) = pluginSplit($pluginAndCell);
-
 		$className = App::className($pluginAndCell, 'View/Cell', 'Cell');
 
 		if (!$className) {
-			throw new Error\MissingCellException(array('className' => $pluginAndCell . 'Cell'));
+			throw new Exception\MissingCellException(array('className' => $pluginAndCell . 'Cell'));
 		}
 
-		$cellInstance = new $className($this->request, $this->response, $this->eventManager(), $options);
-		$cellInstance->template = Inflector::underscore($action);
-		$cellInstance->plugin = !empty($plugin) ? $plugin : null;
-		$cellInstance->theme = !empty($this->theme) ? $this->theme : null;
-		$length = count($data);
-
-		if ($length) {
+		$cell = $this->_createCell($className, $action, $plugin, $options);
+		if (!empty($data)) {
 			$data = array_values($data);
 		}
 
 		try {
-			$reflect = new \ReflectionMethod($cellInstance, $action);
-			$reflect->invokeArgs($cellInstance, $data);
-			return $cellInstance;
+			$reflect = new \ReflectionMethod($cell, $action);
+			$reflect->invokeArgs($cell, $data);
+			return $cell;
 		} catch (\ReflectionException $e) {
 			throw new \BadMethodCallException(sprintf(
 				'Class %s does not have a "%s" method.',
@@ -92,6 +87,32 @@ trait CellTrait {
 				$action
 			));
 		}
+	}
+
+/**
+ * Create and configure the cell instance.
+ *
+ * @param string $className The cell classname.
+ * @param string $action The action name.
+ * @param string $plugin The plugin name.
+ * @param array $options The constructor options for the cell.
+ * @return Cake\View\Cell;
+ */
+	protected function _createCell($className, $action, $plugin, $options) {
+		$instance = new $className($this->request, $this->response, $this->eventManager(), $options);
+		$instance->template = Inflector::underscore($action);
+		$instance->plugin = !empty($plugin) ? $plugin : null;
+		$instance->theme = !empty($this->theme) ? $this->theme : null;
+		if (!empty($this->helpers)) {
+			$instance->helpers = $this->helpers;
+		}
+		if (isset($this->viewClass)) {
+			$instance->viewClass = $this->viewClass;
+		}
+		if ($this instanceof View) {
+			$instance->viewClass = get_class($this);
+		}
+		return $instance;
 	}
 
 }

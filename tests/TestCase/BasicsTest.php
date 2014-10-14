@@ -19,10 +19,10 @@ namespace Cake\Test\TestCase;
 use Cake\Cache\Cache;
 use Cake\Core\App;
 use Cake\Core\Configure;
+use Cake\Filesystem\Folder;
 use Cake\Log\Log;
 use Cake\Network\Response;
 use Cake\TestSuite\TestCase;
-use Cake\Utility\Folder;
 
 require_once CAKE . 'basics.php';
 
@@ -71,40 +71,6 @@ class BasicsTest extends TestCase {
 
 		$server = $_SERVER;
 		$env = $_ENV;
-
-		$_SERVER['HTTP_HOST'] = 'localhost';
-		$this->assertEquals(env('HTTP_BASE'), '.localhost');
-
-		$_SERVER['HTTP_HOST'] = 'com.ar';
-		$this->assertEquals(env('HTTP_BASE'), '.com.ar');
-
-		$_SERVER['HTTP_HOST'] = 'example.ar';
-		$this->assertEquals(env('HTTP_BASE'), '.example.ar');
-
-		$_SERVER['HTTP_HOST'] = 'example.com';
-		$this->assertEquals(env('HTTP_BASE'), '.example.com');
-
-		$_SERVER['HTTP_HOST'] = 'www.example.com';
-		$this->assertEquals(env('HTTP_BASE'), '.example.com');
-
-		$_SERVER['HTTP_HOST'] = 'subdomain.example.com';
-		$this->assertEquals(env('HTTP_BASE'), '.example.com');
-
-		$_SERVER['HTTP_HOST'] = 'example.com.ar';
-		$this->assertEquals(env('HTTP_BASE'), '.example.com.ar');
-
-		$_SERVER['HTTP_HOST'] = 'www.example.com.ar';
-		$this->assertEquals(env('HTTP_BASE'), '.example.com.ar');
-
-		$_SERVER['HTTP_HOST'] = 'subdomain.example.com.ar';
-		$this->assertEquals(env('HTTP_BASE'), '.example.com.ar');
-
-		$_SERVER['HTTP_HOST'] = 'double.subdomain.example.com';
-		$this->assertEquals(env('HTTP_BASE'), '.subdomain.example.com');
-
-		$_SERVER['HTTP_HOST'] = 'double.subdomain.example.com.ar';
-		$this->assertEquals(env('HTTP_BASE'), '.subdomain.example.com.ar');
-
 		$_SERVER = $_ENV = array();
 
 		$_SERVER['SCRIPT_NAME'] = '/a/test/test.php';
@@ -416,35 +382,94 @@ EXPECTED;
  */
 	public function testPr() {
 		ob_start();
-		pr('this is a test');
+		pr(true);
 		$result = ob_get_clean();
-		$expected = "\nthis is a test\n";
+		$expected = "\n1\n\n";
 		$this->assertEquals($expected, $result);
 
 		ob_start();
-		pr(array('this' => 'is', 'a' => 'test'));
+		pr(false);
 		$result = ob_get_clean();
-		$expected = "\nArray\n(\n    [this] => is\n    [a] => test\n)\n\n";
+		$expected = "\n\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pr(null);
+		$result = ob_get_clean();
+		$expected = "\n\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pr(123);
+		$result = ob_get_clean();
+		$expected = "\n123\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pr('123');
+		$result = ob_get_clean();
+		$expected = "\n123\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pr('this is a test');
+		$result = ob_get_clean();
+		$expected = "\nthis is a test\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pr(['this' => 'is', 'a' => 'test', 123 => 456]);
+		$result = ob_get_clean();
+		$expected = "\nArray\n(\n    [this] => is\n    [a] => test\n    [123] => 456\n)\n\n";
 		$this->assertEquals($expected, $result);
 	}
 
 /**
- * test pr()
+ * test pj()
  *
  * @return void
  */
-	public function testPrCli() {
-		$this->skipIf(php_sapi_name() != 'cli', 'Skipping cli test in web mode');
+	public function testPj() {
 		ob_start();
-		pr('this is a test');
+		pj(true);
 		$result = ob_get_clean();
-		$expected = "\nthis is a test\n";
+		$expected = "\ntrue\n\n";
 		$this->assertEquals($expected, $result);
 
 		ob_start();
-		pr(array('this' => 'is', 'a' => 'test'));
+		pj(false);
 		$result = ob_get_clean();
-		$expected = "\nArray\n(\n    [this] => is\n    [a] => test\n)\n\n";
+		$expected = "\nfalse\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pj(null);
+		$result = ob_get_clean();
+		$expected = "\nnull\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pj(123);
+		$result = ob_get_clean();
+		$expected = "\n123\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pj('123');
+		$result = ob_get_clean();
+		$expected = "\n\"123\"\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pj('this is a test');
+		$result = ob_get_clean();
+		$expected = "\n\"this is a test\"\n\n";
+		$this->assertEquals($expected, $result);
+
+		ob_start();
+		pj(['this' => 'is', 'a' => 'test', 123 => 456]);
+		$result = ob_get_clean();
+		$expected = "\n{\n    \"this\": \"is\",\n    \"a\": \"test\",\n    \"123\": 456\n}\n\n";
 		$this->assertEquals($expected, $result);
 	}
 
@@ -502,13 +527,13 @@ EXPECTED;
  */
 	public function testStackTrace() {
 		ob_start();
-		list($r, $expected) = [stackTrace(), \Cake\Utility\Debugger::trace()];
+		list($r, $expected) = [stackTrace(), \Cake\Error\Debugger::trace()];
 		$result = ob_get_clean();
 		$this->assertEquals($expected, $result);
 
 		$opts = ['args' => true];
 		ob_start();
-		list($r, $expected) = [stackTrace($opts), \Cake\Utility\Debugger::trace($opts)];
+		list($r, $expected) = [stackTrace($opts), \Cake\Error\Debugger::trace($opts)];
 		$result = ob_get_clean();
 		$this->assertEquals($expected, $result);
 	}

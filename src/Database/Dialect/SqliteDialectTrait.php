@@ -82,7 +82,7 @@ trait SqliteDialectTrait {
 				$expression
 					->name('ROUND')
 					->type('-')
-					->iterateParts(function($p) {
+					->iterateParts(function ($p) {
 						return new FunctionExpression('JULIANDAY', [$p['value']], [$p['type']]);
 					});
 				break;
@@ -116,15 +116,21 @@ trait SqliteDialectTrait {
 
 		$newQuery = $query->connection()->newQuery();
 		$cols = $v->columns();
+		$placeholder = 0;
 		$replaceQuery = false;
+
 		foreach ($v->values() as $k => $val) {
 			$fillLength = count($cols) - count($val);
 			if ($fillLength > 0) {
 				$val = array_merge($val, array_fill(0, $fillLength, null));
 			}
-			$val = array_map(function($val) {
-				return $val instanceof ExpressionInterface ? $val : '?';
-			}, $val);
+
+			foreach ($val as $col => $attr) {
+				if (!($attr instanceof ExpressionInterface)) {
+					$val[$col] = sprintf(':c%d', $placeholder);
+					$placeholder++;
+				}
+			}
 
 			$select = array_combine($cols, $val);
 			if ($k === 0) {
@@ -157,6 +163,20 @@ trait SqliteDialectTrait {
 			$this->_schemaDialect = new \Cake\Database\Schema\SqliteSchema($this);
 		}
 		return $this->_schemaDialect;
+	}
+
+/**
+ * {@inheritDoc}
+ */
+	public function disableForeignKeySQL() {
+		return 'PRAGMA foreign_keys = OFF';
+	}
+
+/**
+ * {@inheritDoc}
+ */
+	public function enableForeignKeySQL() {
+		return 'PRAGMA foreign_keys = ON';
 	}
 
 }

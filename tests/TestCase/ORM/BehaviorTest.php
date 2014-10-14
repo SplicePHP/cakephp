@@ -28,12 +28,33 @@ class TestBehavior extends Behavior {
 	public function beforeFind() {
 	}
 
+/**
+ * Test for event bindings.
+ */
+	public function beforeValidate() {
+	}
+
+/**
+ * Test for event bindings.
+ */
+	public function afterValidate() {
+	}
+
 }
 
 /**
  * Test Stub.
  */
 class Test2Behavior extends Behavior {
+
+	protected $_defaultConfig = [
+		'implementedFinders' => [
+			'foo' => 'findFoo',
+		],
+		'implementedMethods' => [
+			'doSomething' => 'doSomething',
+		]
+	];
 
 /**
  * Test for event bindings.
@@ -162,7 +183,9 @@ class BehaviorTest extends TestCase {
 		$table = $this->getMock('Cake\ORM\Table');
 		$behavior = new TestBehavior($table);
 		$expected = [
-			'Model.beforeFind' => 'beforeFind'
+			'Model.beforeFind' => 'beforeFind',
+			'Model.beforeValidate' => 'beforeValidate',
+			'Model.afterValidate' => 'afterValidate',
 		];
 		$this->assertEquals($expected, $behavior->implementedEvents());
 	}
@@ -179,7 +202,15 @@ class BehaviorTest extends TestCase {
 			'Model.beforeFind' => [
 				'priority' => 10,
 				'callable' => 'beforeFind'
-			]
+			],
+			'Model.beforeValidate' => [
+				'priority' => 10,
+				'callable' => 'beforeValidate'
+			],
+			'Model.afterValidate' => [
+				'priority' => 10,
+				'callable' => 'afterValidate'
+			],
 		];
 		$this->assertEquals($expected, $behavior->implementedEvents());
 	}
@@ -239,7 +270,7 @@ class BehaviorTest extends TestCase {
 		$table = $this->getMock('Cake\ORM\Table');
 		$behavior = new Test2Behavior($table);
 		$expected = [
-			'foo' => 'findFoo'
+			'foo' => 'findFoo',
 		];
 		$this->assertEquals($expected, $behavior->implementedFinders());
 	}
@@ -272,8 +303,7 @@ class BehaviorTest extends TestCase {
 		$behavior = new Test2Behavior($table, [
 			'implementedFinders' => []
 		]);
-		$expected = [];
-		$this->assertEquals($expected, $behavior->implementedFinders());
+		$this->assertEquals([], $behavior->implementedFinders());
 	}
 
 /**
@@ -311,7 +341,7 @@ class BehaviorTest extends TestCase {
 /**
  * testVerifyImplementedFindersInvalid
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException \Cake\Core\Exception\Exception
  * @expectedExceptionMessage The method findNotDefined is not callable on class Cake\Test\TestCase\ORM\Test2Behavior
  *
  * @return void
@@ -348,7 +378,7 @@ class BehaviorTest extends TestCase {
 /**
  * testVerifyImplementedMethodsInvalid
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException \Cake\Core\Exception\Exception
  * @expectedExceptionMessage The method iDoNotExist is not callable on class Cake\Test\TestCase\ORM\Test2Behavior
  *
  * @return void

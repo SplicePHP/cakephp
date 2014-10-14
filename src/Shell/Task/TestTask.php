@@ -17,14 +17,14 @@ namespace Cake\Shell\Task;
 use Cake\Console\Shell;
 use Cake\Controller\Controller;
 use Cake\Core\Configure;
+use Cake\Core\Exception\Exception;
 use Cake\Core\Plugin;
-use Cake\Error;
+use Cake\Filesystem\Folder;
 use Cake\Network\Request;
 use Cake\Network\Response;
 use Cake\ORM\Association;
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
-use Cake\Utility\Folder;
 use Cake\Utility\Inflector;
 
 /**
@@ -116,7 +116,7 @@ class TestTask extends BakeTask {
 			$this->out(++$i . '. ' . $option);
 		}
 		$this->out('');
-		$this->out('Re-run your command as Console/cake bake <type> <classname>');
+		$this->out('Re-run your command as `cake bake <type> <classname>`');
 	}
 
 /**
@@ -142,7 +142,7 @@ class TestTask extends BakeTask {
 			$this->out(++$i . '. ' . $option);
 		}
 		$this->out('');
-		$this->out('Re-run your command as Console/cake bake ' . $type . ' <classname>');
+		$this->out('Re-run your command as `cake bake ' . $type . ' <classname>`');
 	}
 
 /**
@@ -209,6 +209,8 @@ class TestTask extends BakeTask {
 		$out = $this->Template->generate('classes', 'test');
 
 		$filename = $this->testCaseFileName($type, $fullClassName);
+		$emptyFile = $this->getPath() . $this->getSubspacePath($type) . DS . 'empty';
+		$this->_deleteEmptyFile($emptyFile);
 		if ($this->createFile($filename, $out)) {
 			return $out;
 		}
@@ -273,16 +275,32 @@ class TestTask extends BakeTask {
 	}
 
 /**
+ * Gets the subspace path for a test.
+ *
+ * @param string $type The Type of object you are generating tests for eg. controller.
+ * @return string Path of the subspace.
+ */
+	public function getSubspacePath($type) {
+		$namespace = Configure::read('App.namespace');
+		if ($this->plugin) {
+			$namespace = $this->plugin;
+		}
+		$suffix = $this->classSuffixes[strtolower($type)];
+		$subspace = $this->mapType($type);
+		return str_replace('\\', DS, $subspace);
+	}
+
+/**
  * Map the types that TestTask uses to concrete types that App::className can use.
  *
  * @param string $type The type of thing having a test generated.
  * @return string
- * @throws \Cake\Error\Exception When invalid object types are requested.
+ * @throws \Cake\Core\Exception\Exception When invalid object types are requested.
  */
 	public function mapType($type) {
 		$type = ucfirst($type);
 		if (empty($this->classTypes[$type])) {
-			throw new Error\Exception('Invalid object type.');
+			throw new Exception('Invalid object type.');
 		}
 		return $this->classTypes[$type];
 	}
@@ -335,9 +353,16 @@ class TestTask extends BakeTask {
 		$this->_addFixture($subject->alias());
 		foreach ($subject->associations()->keys() as $alias) {
 			$assoc = $subject->association($alias);
-			$name = $assoc->target()->alias();
+			$target = $assoc->target();
+			$name = $target->alias();
+			$subjectClass = get_class($subject);
+
+			if ($subjectClass !== 'Cake\ORM\Table' && $subjectClass === get_class($target)) {
+				continue;
+			}
+
 			if (!isset($this->_fixtures[$name])) {
-				$this->_processModel($assoc->target());
+				$this->_processModel($target);
 			}
 			if ($assoc->type() === Association::MANY_TO_MANY) {
 				$junction = $assoc->junction();
@@ -356,7 +381,6 @@ class TestTask extends BakeTask {
  * @return void
  */
 	protected function _processController($subject) {
-		$subject->constructClasses();
 		$models = [$subject->modelClass];
 		foreach ($models as $model) {
 			list(, $model) = pluginSplit($model);

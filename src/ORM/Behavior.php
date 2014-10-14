@@ -14,8 +14,8 @@
  */
 namespace Cake\ORM;
 
+use Cake\Core\Exception\Exception;
 use Cake\Core\InstanceConfigTrait;
-use Cake\Error\Exception;
 use Cake\Event\EventListener;
 
 /**
@@ -46,24 +46,33 @@ use Cake\Event\EventListener;
  * CakePHP provides a number of lifecycle events your behaviors can
  * listen to:
  *
- * - `beforeFind(Event $event, Query $query)`
- *   Fired before a query is converted into SQL.
+ * - `beforeFind(Event $event, Query $query, ArrayObject $options, boolean $primary)`
+ *   Fired before each find operation. By stopping the event and supplying a
+ *   return value you can bypass the find operation entirely. Any changes done
+ *   to the $query instance will be retained for the rest of the find. The
+ *   $primary parameter indicates whether or not this is the root query,
+ *   or an associated query.
  *
- * - `beforeDelete(Event $event, Entity $entity)`
- *   Fired before an entity is deleted.
+ * - `beforeValidate(Event $event, Entity $entity, ArrayObject $options, Validator $validator)`
+ *   Fired before an entity is validated. By stopping this event, you can abort
+ *   the validate + save operations.
  *
- * - `afterDelete(Event $event, Entity $entity)`
- *   Fired after an entity has been deleted. The entity parameter
- *   will contain the entity state from before it was deleted.
+ * - `afterValidate(Event $event, Entity $entity, ArrayObject $options, Validator $validator)`
+ *   Fired after an entity is validated.
  *
- * - `beforeSave(Event $event, Entity $entity)`
- *   Fired before an entity is saved. In the case where
- *   multiple entities are being saved, one event will be fired
- *   for each entity.
+ * - `beforeSave(Event $event, Entity $entity, ArrayObject $options)`
+ *   Fired before each entity is saved. Stopping this event will abort the save
+ *   operation. When the event is stopped the result of the event will be returned.
  *
- * - `afterSave(Event $event, Entity $entity)`
- *   Fired after an entity is saved. The saved entity will be provided
- *   as a parameter.
+ * - `afterSave(Event $event, Entity $entity, ArrayObject $options)`
+ *   Fired after an entity is saved.
+ *
+ * - `beforeDelete(Event $event, Entity $entity, ArrayObject $options)`
+ *   Fired before an entity is deleted. By stopping this event you will abort
+ *   the delete operation.
+ *
+ * - `afterDelete(Event $event, Entity $entity, ArrayObject $options)`
+ *   Fired after an entity has been deleted.
  *
  * In addition to the core events, behaviors can respond to any
  * event fired from your Table classes including custom application
@@ -116,25 +125,65 @@ class Behavior implements EventListener {
 /**
  * Constructor
  *
- * Merge config with the default and store in the config property
+ * Merges config with the default and store in the config property
  *
  * Does not retain a reference to the Table object. If you need this
  * you should override the constructor.
  *
- * @param Table $table The table this behavior is attached to.
+ * @param \Cake\ORM\Table $table The table this behavior is attached to.
  * @param array $config The config for this behavior.
  */
 	public function __construct(Table $table, array $config = []) {
+		$config = $this->_resolveMethodAliases(
+			'implementedFinders',
+			$this->_defaultConfig,
+			$config
+		);
+		$config = $this->_resolveMethodAliases(
+			'implementedMethods',
+			$this->_defaultConfig,
+			$config
+		);
 		$this->config($config);
+	}
+
+/**
+ * Removes aliased methods that would otherwise be duplicated by userland configuration.
+ *
+ * @param string $key The key to filter.
+ * @param array $defaults The default method mappings.
+ * @param array $config The customized method mappings.
+ * @return array A de-duped list of config data.
+ */
+	protected function _resolveMethodAliases($key, $defaults, $config) {
+		if (!isset($defaults[$key], $config[$key])) {
+			return $config;
+		}
+		if (isset($config[$key]) && $config[$key] === []) {
+			$this->config($key, [], false);
+			unset($config[$key]);
+			return $config;
+		}
+
+		$indexed = array_flip($defaults[$key]);
+		$indexedCustom = array_flip($config[$key]);
+		foreach ($indexed as $method => $alias) {
+			if (!isset($indexedCustom[$method])) {
+				$indexedCustom[$method] = $alias;
+			}
+		}
+		$this->config($key, array_flip($indexedCustom), false);
+		unset($config[$key]);
+		return $config;
 	}
 
 /**
  * verifyConfig
  *
- * Check that implemented* keys contain values pointing at callable.
+ * Checks that implemented keys contain values pointing at callable.
  *
  * @return void
- * @throws \Cake\Error\Exception if config are invalid
+ * @throws \Cake\Core\Exception\Exception if config are invalid
  */
 	public function verifyConfig() {
 		$keys = ['implementedFinders', 'implementedMethods'];
@@ -152,7 +201,7 @@ class Behavior implements EventListener {
 	}
 
 /**
- * Get the Model callbacks this behavior is interested in.
+ * Gets the Model callbacks this behavior is interested in.
  *
  * By defining one of the callback methods a behavior is assumed
  * to be interested in the related event.
@@ -169,6 +218,8 @@ class Behavior implements EventListener {
 			'Model.afterSave' => 'afterSave',
 			'Model.beforeDelete' => 'beforeDelete',
 			'Model.afterDelete' => 'afterDelete',
+			'Model.beforeValidate' => 'beforeValidate',
+			'Model.afterValidate' => 'afterValidate',
 		];
 		$config = $this->config();
 		$priority = isset($config['priority']) ? $config['priority'] : null;
@@ -193,7 +244,7 @@ class Behavior implements EventListener {
 /**
  * implementedFinders
  *
- * provides and alias->methodname map of which finders a behavior implements. Example:
+ * Provides an alias->methodname map of which finders a behavior implements. Example:
  *
  * {{{
  *  [
@@ -212,18 +263,18 @@ class Behavior implements EventListener {
  * @return array
  */
 	public function implementedFinders() {
-		if (isset($this->_config['implementedFinders'])) {
-			return $this->_config['implementedFinders'];
+		$methods = $this->config('implementedFinders');
+		if (isset($methods)) {
+			return $methods;
 		}
 
-		$reflectionMethods = $this->_reflectionCache();
-		return $reflectionMethods['finders'];
+		return $this->_reflectionCache()['finders'];
 	}
 
 /**
  * implementedMethods
  *
- * provides an alias->methodname map of which methods a behavior implements. Example:
+ * Provides an alias->methodname map of which methods a behavior implements. Example:
  *
  * {{{
  *  [
@@ -242,18 +293,18 @@ class Behavior implements EventListener {
  * @return array
  */
 	public function implementedMethods() {
-		if (isset($this->_config['implementedMethods'])) {
-			return $this->_config['implementedMethods'];
+		$methods = $this->config('implementedMethods');
+		if (isset($methods)) {
+			return $methods;
 		}
 
-		$reflectionMethods = $this->_reflectionCache();
-		return $reflectionMethods['methods'];
+		return $this->_reflectionCache()['methods'];
 	}
 
 /**
- * Get the methods implemented by this behavior
+ * Gets the methods implemented by this behavior
  *
- * Use the implementedEvents() method to exclude callback methods.
+ * Uses the implementedEvents() method to exclude callback methods.
  * Methods starting with `_` will be ignored, as will methods
  * declared on Cake\ORM\Behavior
  *
@@ -291,12 +342,9 @@ class Behavior implements EventListener {
 
 		foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
 			$methodName = $method->getName();
-			if (in_array($methodName, $baseMethods)) {
-				continue;
-			}
-
-			$methodName = $method->getName();
-			if (strpos($methodName, '_') === 0 || isset($eventMethods[$methodName])) {
+			if (in_array($methodName, $baseMethods) ||
+				isset($eventMethods[$methodName])
+			) {
 				continue;
 			}
 

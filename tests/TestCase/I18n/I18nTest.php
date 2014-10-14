@@ -40,7 +40,7 @@ class I18nTest extends TestCase {
  */
 	public function setUp() {
 		parent::setUp();
-		$this->locale = I18n::defaultLocale();
+		$this->locale = I18n::locale();
 	}
 
 /**
@@ -52,7 +52,7 @@ class I18nTest extends TestCase {
 		parent::tearDown();
 		I18n::clear();
 		I18n::defaultFormatter('default');
-		I18n::defaultLocale($this->locale);
+		I18n::locale($this->locale);
 		Plugin::unload();
 		Cache::clear(false, '_cake_core_');
 	}
@@ -116,7 +116,7 @@ class I18nTest extends TestCase {
  * @return void
  */
 	public function testCreateCustomTranslationPackage() {
-		I18n::translator('custom', 'fr_FR', function() {
+		I18n::translator('custom', 'fr_FR', function () {
 			$package = new Package('default');
 			$package->setMessages([
 				'Cow' => 'Le moo'
@@ -169,15 +169,15 @@ class I18nTest extends TestCase {
 	}
 
 /**
- * Tests the defaultLocale method
+ * Tests the locale method
  *
  * @return void
  */
 	public function testDefaultLocale() {
-		$this->assertEquals('en_US', I18n::defaultLocale());
+		$this->assertEquals('en_US', I18n::locale());
 		$this->assertEquals('en_US', ini_get('intl.default_locale'));
-		I18n::defaultLocale('fr_FR');
-		$this->assertEquals('fr_FR', I18n::defaultLocale());
+		I18n::locale('fr_FR');
+		$this->assertEquals('fr_FR', I18n::locale());
 		$this->assertEquals('fr_FR', ini_get('intl.default_locale'));
 	}
 
@@ -188,7 +188,7 @@ class I18nTest extends TestCase {
  * @return void
  */
 	public function testGetTranslatorByDefaultLocale() {
-		I18n::translator('custom', 'fr_FR', function() {
+		I18n::translator('custom', 'fr_FR', function () {
 			$package = new Package('default');
 			$package->setMessages([
 				'Cow' => 'Le moo'
@@ -196,7 +196,7 @@ class I18nTest extends TestCase {
 			return $package;
 		});
 
-		I18n::defaultLocale('fr_FR');
+		I18n::locale('fr_FR');
 		$translator = I18n::translator('custom');
 		$this->assertEquals('Le moo', $translator->translate('Cow'));
 	}
@@ -232,7 +232,7 @@ class I18nTest extends TestCase {
  * @return void
  */
 	public function testBasicDomainFunction() {
-		I18n::translator('custom', 'en_US', function() {
+		I18n::translator('custom', 'en_US', function () {
 			$package = new Package('default');
 			$package->setMessages([
 				'Cow' => 'Le moo',
@@ -250,7 +250,7 @@ class I18nTest extends TestCase {
  * @return void
  */
 	public function testBasicDomainPluralFunction() {
-		I18n::translator('custom', 'en_US', function() {
+		I18n::translator('custom', 'en_US', function () {
 			$package = new Package('default');
 			$package->setMessages([
 				'Cow' => 'Le Moo',
@@ -271,7 +271,7 @@ class I18nTest extends TestCase {
  * @return void
  */
 	public function testBasicContextFunction() {
-		I18n::translator('default', 'en_US', function() {
+		I18n::translator('default', 'en_US', function () {
 			$package = new Package('default');
 			$package->setMessages([
 				'letter' => [
@@ -283,10 +283,116 @@ class I18nTest extends TestCase {
 			]);
 			return $package;
 		});
+
 		$this->assertEquals('The letter A', __x('character', 'letter', ['A']));
 		$this->assertEquals(
 			'She wrote a letter to Thomas',
 			__x('communication', 'letter', ['Thomas'])
+		);
+	}
+
+/**
+ * Tests the __xn() function
+ *
+ * @return void
+ */
+	public function testPluralContextFunction() {
+		I18n::translator('default', 'en_US', function () {
+			$package = new Package('default');
+			$package->setMessages([
+				'letter' => [
+					'_context' => [
+						'character' => [
+							'The letter {0}',
+							'The letters {0} and {1}'
+						],
+						'communication' => [
+							'She wrote a letter to {0}',
+							'She wrote a letter to {0} and {1}'
+						]
+					]
+				]
+			]);
+			return $package;
+		});
+		$this->assertEquals('The letters A and B', __xn('character', 'letter', 'letters', 2, ['A', 'B']));
+		$this->assertEquals('The letter A', __xn('character', 'letter', 'letters', 1, ['A']));
+
+		$this->assertEquals(
+			'She wrote a letter to Thomas and Sara',
+			__xn('communication', 'letter', 'letters', 2, ['Thomas', 'Sara'])
+		);
+		$this->assertEquals(
+			'She wrote a letter to Thomas',
+			__xn('communication', 'letter', 'letters', 1, ['Thomas'])
+		);
+	}
+
+/**
+ * Tests the __dx() function
+ *
+ * @return void
+ */
+	public function testDomainContextFunction() {
+		I18n::translator('custom', 'en_US', function () {
+			$package = new Package('default');
+			$package->setMessages([
+				'letter' => [
+					'_context' => [
+						'character' => 'The letter {0}',
+						'communication' => 'She wrote a letter to {0}'
+					]
+				]
+			]);
+			return $package;
+		});
+
+		$this->assertEquals('The letter A', __dx('custom', 'character', 'letter', ['A']));
+		$this->assertEquals(
+			'She wrote a letter to Thomas',
+			__dx('custom', 'communication', 'letter', ['Thomas'])
+		);
+	}
+
+/**
+ * Tests the __dxn() function
+ *
+ * @return void
+ */
+	public function testDomainPluralContextFunction() {
+		I18n::translator('custom', 'en_US', function () {
+			$package = new Package('default');
+			$package->setMessages([
+				'letter' => [
+					'_context' => [
+						'character' => [
+							'The letter {0}',
+							'The letters {0} and {1}'
+						],
+						'communication' => [
+							'She wrote a letter to {0}',
+							'She wrote a letter to {0} and {1}'
+						]
+					]
+				]
+			]);
+			return $package;
+		});
+		$this->assertEquals(
+			'The letters A and B',
+			__dxn('custom', 'character', 'letter', 'letters', 2, ['A', 'B'])
+		);
+		$this->assertEquals(
+			'The letter A',
+			__dxn('custom', 'character', 'letter', 'letters', 1, ['A']));
+
+		$this->assertEquals(
+			'She wrote a letter to Thomas and Sara',
+			__dxn('custom', 'communication', 'letter', 'letters', 2, ['Thomas', 'Sara'])
+		);
+		$this->assertEquals(
+			'She wrote a letter to Thomas',
+			__dxn('custom', 'communication', 'letter', 'letters', 1, ['Thomas'])
 		);
 	}
 
@@ -317,7 +423,7 @@ class I18nTest extends TestCase {
  * @return void
  */
 	public function testloaderFactory() {
-		I18n::config('custom', function($name, $locale) {
+		I18n::config('custom', function ($name, $locale) {
 			$this->assertEquals('custom', $name);
 			$package = new Package('default');
 
@@ -362,7 +468,7 @@ class I18nTest extends TestCase {
  * @return void
  */
 	public function testFallbackTranslator() {
-		I18n::translator('default', 'fr_FR', function() {
+		I18n::translator('default', 'fr_FR', function () {
 			$package = new Package('default');
 			$package->setMessages([
 				'Dog' => 'Le bark'
@@ -370,7 +476,7 @@ class I18nTest extends TestCase {
 			return $package;
 		});
 
-		I18n::translator('custom', 'fr_FR', function() {
+		I18n::translator('custom', 'fr_FR', function () {
 			$package = new Package('default');
 			$package->setMessages([
 				'Cow' => 'Le moo'
@@ -390,14 +496,14 @@ class I18nTest extends TestCase {
  * @return void
  */
 	public function testFallbackTranslatorWithFactory() {
-		I18n::translator('default', 'fr_FR', function() {
+		I18n::translator('default', 'fr_FR', function () {
 			$package = new Package('default');
 			$package->setMessages([
 				'Dog' => 'Le bark'
 			]);
 			return $package;
 		});
-		I18n::config('custom', function($name, $locale) {
+		I18n::config('custom', function ($name, $locale) {
 			$this->assertEquals('custom', $name);
 			$package = new Package('default');
 			$package->setMessages([

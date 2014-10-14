@@ -30,14 +30,19 @@ class EntityTest extends TestCase {
  */
 	public function testSetOneParamNoSetters() {
 		$entity = new Entity;
+		$this->assertNull($entity->getOriginal('foo'));
 		$entity->set('foo', 'bar');
 		$this->assertEquals('bar', $entity->foo);
+		$this->assertEquals('bar', $entity->getOriginal('foo'));
 
 		$entity->set('foo', 'baz');
 		$this->assertEquals('baz', $entity->foo);
+		$this->assertEquals('bar', $entity->getOriginal('foo'));
 
 		$entity->set('id', 1);
 		$this->assertSame(1, $entity->id);
+		$this->assertEquals(1, $entity->getOriginal('id'));
+		$this->assertEquals('bar', $entity->getOriginal('foo'));
 	}
 
 /**
@@ -57,6 +62,8 @@ class EntityTest extends TestCase {
 		$this->assertEquals('baz', $entity->foo);
 		$this->assertSame(2, $entity->id);
 		$this->assertSame(3, $entity->thing);
+		$this->assertEquals('bar', $entity->getOriginal('foo'));
+		$this->assertEquals(1, $entity->getOriginal('id'));
 	}
 
 /**
@@ -68,7 +75,7 @@ class EntityTest extends TestCase {
 		$entity = $this->getMock('\Cake\ORM\Entity', ['_setName']);
 		$entity->expects($this->once())->method('_setName')
 			->with('Jones')
-			->will($this->returnCallback(function($name) {
+			->will($this->returnCallback(function ($name) {
 				$this->assertEquals('Jones', $name);
 				return 'Dr. ' . $name;
 			}));
@@ -86,13 +93,13 @@ class EntityTest extends TestCase {
 		$entity->accessible('*', true);
 		$entity->expects($this->once())->method('_setName')
 			->with('Jones')
-			->will($this->returnCallback(function($name) {
+			->will($this->returnCallback(function ($name) {
 				$this->assertEquals('Jones', $name);
 				return 'Dr. ' . $name;
 			}));
 		$entity->expects($this->once())->method('_setStuff')
 			->with(['a', 'b'])
-			->will($this->returnCallback(function($stuff) {
+			->will($this->returnCallback(function ($stuff) {
 				$this->assertEquals(['a', 'b'], $stuff);
 				return ['c', 'd'];
 			}));
@@ -182,7 +189,7 @@ class EntityTest extends TestCase {
 		$entity = $this->getMock('\Cake\ORM\Entity', ['_getName']);
 		$entity->expects($this->exactly(2))->method('_getName')
 			->with('Jones')
-			->will($this->returnCallback(function($name) {
+			->will($this->returnCallback(function ($name) {
 				$this->assertSame('Jones', $name);
 				return 'Dr. ' . $name;
 			}));
@@ -213,7 +220,7 @@ class EntityTest extends TestCase {
 		$entity = $this->getMock('\Cake\ORM\Entity', ['_setName']);
 		$entity->expects($this->once())->method('_setName')
 			->with('Jones')
-			->will($this->returnCallback(function($name) {
+			->will($this->returnCallback(function ($name) {
 				$this->assertEquals('Jones', $name);
 				return 'Dr. ' . $name;
 			}));
@@ -230,7 +237,7 @@ class EntityTest extends TestCase {
 		$entity = $this->getMock('\Cake\ORM\Entity', ['_getName']);
 		$entity->expects($this->once())->method('_getName')
 			->with('Jones')
-			->will($this->returnCallback(function($name) {
+			->will($this->returnCallback(function ($name) {
 				$this->assertSame('Jones', $name);
 				return 'Dr. ' . $name;
 			}));
@@ -570,11 +577,12 @@ class EntityTest extends TestCase {
  * @return void
  */
 	public function testIsNew() {
-		$entity = new Entity([
+		$data = [
 			'id' => 1,
 			'title' => 'Foo',
 			'author_id' => 3
-		]);
+		];
+		$entity = new Entity($data);
 		$this->assertTrue($entity->isNew());
 
 		$entity->isNew(true);
@@ -785,6 +793,13 @@ class EntityTest extends TestCase {
 		$this->assertEmpty($entity->errors());
 		$this->assertSame($entity, $entity->errors('foo', 'bar'));
 		$this->assertEquals(['bar'], $entity->errors('foo'));
+
+		$this->assertEquals([], $entity->errors('boo'));
+		$entity['boo'] = [
+			'someting' => 'stupid',
+			'and' => false
+		];
+		$this->assertEquals([], $entity->errors('boo'));
 
 		$entity->errors('foo', 'other error');
 		$this->assertEquals(['other error'], $entity->errors('foo'));
@@ -1055,6 +1070,7 @@ class EntityTest extends TestCase {
 			'accessible' => ['*' => true, 'name' => true],
 			'properties' => ['foo' => 'bar'],
 			'dirty' => ['foo' => true],
+			'original' => [],
 			'virtual' => ['baz'],
 			'errors' => ['foo' => ['An error']],
 			'repository' => 'foos'

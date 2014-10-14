@@ -200,7 +200,7 @@ class Query implements ExpressionInterface, IteratorAggregate {
  *
  * ## Example:
  * {{{
- *	$query->select(['title'])->from('articles')->traverse(function($value, $clause) {
+ *	$query->select(['title'])->from('articles')->traverse(function ($value, $clause) {
  *		if ($clause === 'select') {
  *			var_dump($value);
  *		}
@@ -694,7 +694,7 @@ class Query implements ExpressionInterface, IteratorAggregate {
  * {{{
  *	$query
  *	->where(['title !=' => 'Hello World'])
- *	->where(function($exp, $query) {
+ *	->where(function ($exp, $query) {
  *		$or = $exp->or_(['id' => 1]);
  *		$and = $exp->and_(['id >' => 2, 'id <' => 10]);
  *	return $or->add($and);
@@ -775,7 +775,7 @@ class Query implements ExpressionInterface, IteratorAggregate {
  * {{{
  * $query
  *   ->where(['title' => 'Foo'])
- *   ->andWhere(function($exp, $query) {
+ *   ->andWhere(function ($exp, $query) {
  *     return $exp
  *       ->add(['author_id' => 1])
  *       ->or_(['author_id' => 2]);
@@ -836,7 +836,7 @@ class Query implements ExpressionInterface, IteratorAggregate {
  * {{{
  * $query
  *   ->where(['title' => 'Foo'])
- *   ->orWhere(function($exp, $query) {
+ *   ->orWhere(function ($exp, $query) {
  *     return $exp
  *       ->add(['author_id' => 1])
  *       ->or_(['author_id' => 2]);
@@ -1016,9 +1016,14 @@ class Query implements ExpressionInterface, IteratorAggregate {
  * Pages should start at 1.
  *
  * @param int $num The page number you want.
+ * @param int $limit The number of rows you want in the page. If null
+ *  the current limit clause will be used.
  * @return $this
  */
-	public function page($num) {
+	public function page($num, $limit = null) {
+		if ($limit !== null) {
+			$this->limit($limit);
+		}
 		$limit = $this->clause('limit');
 		if ($limit === null) {
 			$limit = 25;
@@ -1434,7 +1439,7 @@ class Query implements ExpressionInterface, IteratorAggregate {
  * ## Example
  *
  * {{{
- * $query->decorateResults(function($row) {
+ * $query->decorateResults(function ($row) {
  *   $row['order_total'] = $row['subtotal'] + ($row['subtotal'] * $row['tax']);
  *    return $row;
  * });
@@ -1469,7 +1474,7 @@ class Query implements ExpressionInterface, IteratorAggregate {
  * @return $this
  */
 	public function traverseExpressions(callable $callback) {
-		$visitor = function($expression) use (&$visitor, $callback) {
+		$visitor = function ($expression) use (&$visitor, $callback) {
 			if (is_array($expression)) {
 				foreach ($expression as $e) {
 					$visitor($e);

@@ -14,10 +14,15 @@
  */
 namespace Cake\Database;
 
+use Cake\Database\Exception\MissingConnectionException;
+use Cake\Database\Exception\MissingDriverException;
+use Cake\Database\Exception\MissingExtensionException;
 use Cake\Database\Log\LoggedQuery;
 use Cake\Database\Log\LoggingStatement;
 use Cake\Database\Log\QueryLogger;
 use Cake\Database\Query;
+use Cake\Database\Schema\CachedCollection;
+use Cake\Database\Schema\Collection as SchemaCollection;
 use Cake\Database\ValueBinder;
 
 /**
@@ -79,6 +84,13 @@ class Connection {
 	protected $_logger = null;
 
 /**
+ * The schema collection object
+ *
+ * @var \Cake\Database\Schema\Collection
+ */
+	protected $_schemaCollection;
+
+/**
  * Constructor.
  *
  * @param array $config configuration for connecting to database
@@ -135,8 +147,8 @@ class Connection {
  *
  * @param string|\Cake\Database\Driver $driver The driver instance to use.
  * @param array|null $config Either config for a new driver or null.
- * @throws \Cake\Database\Error\MissingDriverException When a driver class is missing.
- * @throws \Cake\Database\Error\MissingExtensionException When a driver's PHP extension is missing.
+ * @throws \Cake\Database\Exception\MissingDriverException When a driver class is missing.
+ * @throws \Cake\Database\Exception\MissingExtensionException When a driver's PHP extension is missing.
  * @return \Cake\Database\Driver
  */
 	public function driver($driver = null, $config = null) {
@@ -145,12 +157,12 @@ class Connection {
 		}
 		if (is_string($driver)) {
 			if (!class_exists($driver)) {
-				throw new Error\MissingDriverException(['driver' => $driver]);
+				throw new MissingDriverException(['driver' => $driver]);
 			}
 			$driver = new $driver($config);
 		}
 		if (!$driver->enabled()) {
-			throw new Error\MissingExtensionException(['driver' => get_class($driver)]);
+			throw new MissingExtensionException(['driver' => get_class($driver)]);
 		}
 		return $this->_driver = $driver;
 	}
@@ -158,15 +170,15 @@ class Connection {
 /**
  * Connects to the configured database.
  *
- * @throws \Cake\Database\Error\MissingConnectionException if credentials are invalid
+ * @throws \Cake\Database\Exception\MissingConnectionException if credentials are invalid
  * @return bool true on success or false if already connected.
  */
 	public function connect() {
 		try {
 			$this->_driver->connect();
 			return true;
-		} catch(\Exception $e) {
-			throw new Error\MissingConnectionException(['reason' => $e->getMessage()]);
+		} catch (\Exception $e) {
+			throw new MissingConnectionException(['reason' => $e->getMessage()]);
 		}
 	}
 
@@ -237,7 +249,7 @@ class Connection {
 	}
 
 /**
- * Executes the provided query after compiling it for the specific dirver
+ * Executes the provided query after compiling it for the specific driver
  * dialect and returns the executed Statement object.
  *
  * @param \Cake\Database\Query $query The query to be executed
@@ -277,12 +289,25 @@ class Connection {
 	}
 
 /**
- * Get a Schema\Collection object for this connection.
+ * Gets or sets a Schema\Collection object for this connection.
  *
+ * @param \Cake\Database\Schema\Collection $collection The schema collection object
  * @return \Cake\Database\Schema\Collection
  */
-	public function schemaCollection() {
-		return new \Cake\Database\Schema\Collection($this);
+	public function schemaCollection(SchemaCollection $collection = null) {
+		if ($collection !== null) {
+			return $this->_schemaCollection = $collection;
+		}
+
+		if ($this->_schemaCollection !== null) {
+			return $this->_schemaCollection;
+		}
+
+		if (!empty($this->_config['cacheMetadata'])) {
+			return $this->_schemaCollection = new CachedCollection($this, $this->_config['cacheMetadata']);
+		}
+
+		return $this->_schemaCollection = new SchemaCollection($this);
 	}
 
 /**
@@ -467,6 +492,24 @@ class Connection {
 	}
 
 /**
+ * Run driver specific SQL to disable foreign key checks.
+ *
+ * @return void
+ */
+	public function disableForeignKeys() {
+		$this->execute($this->_driver->disableForeignKeySql());
+	}
+
+/**
+ * Run driver specific SQL to enable foreign key checks.
+ *
+ * @return void
+ */
+	public function enableForeignKeys() {
+		$this->execute($this->_driver->enableForeignKeySql());
+	}
+
+/**
  * Executes a callable function inside a transaction, if any exception occurs
  * while executing the passed callable, the transaction will be rolled back
  * If the result of the callable function is ``false``, the transaction will
@@ -478,7 +521,7 @@ class Connection {
  * ### Example:
  *
  * {{{
- * $connection->transactional(function($connection) {
+ * $connection->transactional(function ($connection) {
  *   $connection->newQuery()->delete('users')->execute();
  * });
  * }}}
@@ -554,7 +597,7 @@ class Connection {
 	}
 
 /**
- * Enables or disables metadata caching for this connectino
+ * Enables or disables metadata caching for this connection
  *
  * Changing this setting will not modify existing schema collections objects.
  *
@@ -563,6 +606,7 @@ class Connection {
  * @return void
  */
 	public function cacheMetadata($cache) {
+		$this->_schemaCollection = null;
 		$this->_config['cacheMetadata'] = $cache;
 	}
 
@@ -606,6 +650,36 @@ class Connection {
 		$log = new LoggingStatement($statement, $this->driver());
 		$log->logger($this->logger());
 		return $log;
+	}
+
+/**
+ * Returns an array that can be used to describe the internal state of this
+ * object.
+ *
+ * @return array
+ */
+	public function __debugInfo() {
+		$secrets = [
+			'password' => '*****',
+			'login' => '*****',
+			'host' => '*****',
+			'database' => '*****',
+			'port' => '*****',
+			'prefix' => '*****',
+			'schema' => '*****'
+		];
+		$replace = array_intersect_key($secrets, $this->_config);
+		$config = $replace + $this->_config;
+
+		return [
+			'config' => $config,
+			'driver' => $this->_driver,
+			'transactionLevel' => $this->_transactionLevel,
+			'transactionStarted' => $this->_transactionStarted,
+			'useSavePoints' => $this->_useSavePoints,
+			'logQueries' => $this->_logQueries,
+			'logger' => $this->_logger
+		];
 	}
 
 }

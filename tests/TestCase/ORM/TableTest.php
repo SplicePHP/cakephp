@@ -19,9 +19,10 @@ use Cake\Database\Expression\OrderByExpression;
 use Cake\Database\Expression\QueryExpression;
 use Cake\Database\TypeMap;
 use Cake\Datasource\ConnectionManager;
+use Cake\Event\EventManager;
+use Cake\I18n\Time;
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
-use Cake\Utility\Time;
 use Cake\Validation\Validator;
 
 /**
@@ -38,8 +39,8 @@ class UsersTable extends Table {
 class TableTest extends \Cake\TestSuite\TestCase {
 
 	public $fixtures = [
-		'core.user', 'core.category', 'core.article', 'core.author',
-		'core.tag', 'core.articles_tag'
+		'core.users', 'core.categories', 'core.articles', 'core.authors',
+		'core.tags', 'core.articles_tags'
 	];
 
 /**
@@ -81,6 +82,11 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		]);
 	}
 
+/**
+ * teardown method
+ *
+ * @return void
+ */
 	public function tearDown() {
 		parent::tearDown();
 		TableRegistry::clear();
@@ -276,7 +282,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		$table->expects($this->once())
 			->method('_initializeSchema')
 			->with($schema)
-			->will($this->returnCallback(function($schema) {
+			->will($this->returnCallback(function ($schema) {
 				$schema->columnType('username', 'integer');
 				return $schema;
 			}));
@@ -911,7 +917,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
  * Tests that using a simple string for entityClass will throw an exception
  * when the class does not exist in the namespace
  *
- * @expectedException \Cake\ORM\Error\MissingEntityException
+ * @expectedException \Cake\ORM\Exception\MissingEntityException
  * @expectedExceptionMessage Entity class FooUser could not be found.
  * @return void
  */
@@ -1070,6 +1076,23 @@ class TableTest extends \Cake\TestSuite\TestCase {
 	}
 
 /**
+ * Test adding a behavior that is a duplicate.
+ *
+ * @return void
+ */
+	public function testAddBehaviorDuplicate() {
+		$table = new Table(['table' => 'articles']);
+		$this->assertNull($table->addBehavior('Sluggable', ['test' => 'value']));
+		$this->assertNull($table->addBehavior('Sluggable', ['test' => 'value']));
+		try {
+			$table->addBehavior('Sluggable', ['thing' => 'thing']);
+			$this->fail('No exception raised');
+		} catch (\RuntimeException $e) {
+			$this->assertContains('The "Sluggable" alias has already been loaded', $e->getMessage());
+		}
+	}
+
+/**
  * Test removing a behavior from a table.
  *
  * @return void
@@ -1101,7 +1124,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 /**
  * Ensure exceptions are raised on missing behaviors.
  *
- * @expectedException \Cake\ORM\Error\MissingBehaviorException
+ * @expectedException \Cake\ORM\Exception\MissingBehaviorException
  */
 	public function testAddBehaviorMissing() {
 		$table = TableRegistry::get('article');
@@ -1116,7 +1139,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 	public function testCallBehaviorMethod() {
 		$table = TableRegistry::get('article');
 		$table->addBehavior('Sluggable');
-		$this->assertEquals('some_value', $table->slugify('some value'));
+		$this->assertEquals('some-value', $table->slugify('some value'));
 	}
 
 /**
@@ -1127,7 +1150,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 	public function testCallBehaviorAliasedMethod() {
 		$table = TableRegistry::get('article');
 		$table->addBehavior('Sluggable', ['implementedMethods' => ['wednesday' => 'slugify']]);
-		$this->assertEquals('some_value', $table->wednesday('some value'));
+		$this->assertEquals('some-value', $table->wednesday('some value'));
 	}
 
 /**
@@ -1273,7 +1296,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			'created' => new Time('2013-10-10 00:00'),
 			'updated' => new Time('2013-10-10 00:00')
 		]);
-		$listener = function($e, $entity, $options) use ($data) {
+		$listener = function ($e, $entity, $options) use ($data) {
 			$this->assertSame($data, $entity);
 			$entity->set('password', 'foo');
 		};
@@ -1298,10 +1321,10 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			'created' => new Time('2013-10-10 00:00'),
 			'updated' => new Time('2013-10-10 00:00')
 		]);
-		$listener1 = function($e, $entity, $options) {
+		$listener1 = function ($e, $entity, $options) {
 			$options['crazy'] = true;
 		};
-		$listener2 = function($e, $entity, $options) {
+		$listener2 = function ($e, $entity, $options) {
 			$this->assertTrue($options['crazy']);
 		};
 		$table->eventManager()->attach($listener1, 'Model.beforeSave');
@@ -1327,7 +1350,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			'created' => new Time('2013-10-10 00:00'),
 			'updated' => new Time('2013-10-10 00:00')
 		]);
-		$listener = function($e, $entity) {
+		$listener = function ($e, $entity) {
 			$e->stopPropagation();
 			return $entity;
 		};
@@ -1353,7 +1376,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		]);
 
 		$called = false;
-		$listener = function($e, $entity, $options) use ($data, &$called) {
+		$listener = function ($e, $entity, $options) use ($data, &$called) {
 			$this->assertSame($data, $entity);
 			$called = true;
 		};
@@ -1397,7 +1420,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			->will($this->returnValue(0));
 
 		$called = false;
-		$listener = function($e, $entity, $options) use ($data, &$called) {
+		$listener = function ($e, $entity, $options) use ($data, &$called) {
 			$called = true;
 		};
 		$table->eventManager()->attach($listener, 'Model.afterSave');
@@ -1650,7 +1673,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		]);
 		$table = TableRegistry::get('users');
 		$called = false;
-		$listener = function($event, $entity) use (&$called) {
+		$listener = function ($event, $entity) use (&$called) {
 			$this->assertFalse($entity->isNew());
 			$called = true;
 		};
@@ -1885,6 +1908,9 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			->method('attach');
 
 		$mock->expects($this->at(1))
+			->method('dispatch');
+
+		$mock->expects($this->at(2))
 			->method('dispatch')
 			->with($this->logicalAnd(
 				$this->attributeEqualTo('_name', 'Model.beforeDelete'),
@@ -1894,7 +1920,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 				)
 			));
 
-		$mock->expects($this->at(2))
+		$mock->expects($this->at(3))
 			->method('dispatch')
 			->with($this->logicalAnd(
 				$this->attributeEqualTo('_name', 'Model.afterDelete'),
@@ -1919,9 +1945,9 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		$options = new \ArrayObject(['atomic' => true, 'cascade' => true]);
 
 		$mock = $this->getMock('Cake\Event\EventManager');
-		$mock->expects($this->once())
+		$mock->expects($this->at(2))
 			->method('dispatch')
-			->will($this->returnCallback(function($event) {
+			->will($this->returnCallback(function ($event) {
 				$event->stopPropagation();
 			}));
 
@@ -1941,9 +1967,9 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		$options = new \ArrayObject(['atomic' => true, 'cascade' => true]);
 
 		$mock = $this->getMock('Cake\Event\EventManager');
-		$mock->expects($this->once())
+		$mock->expects($this->at(2))
 			->method('dispatch')
-			->will($this->returnCallback(function($event) {
+			->will($this->returnCallback(function ($event) {
 				$event->stopPropagation();
 				$event->result = 'got stopped';
 			}));
@@ -2105,7 +2131,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			'username' => 'superuser'
 		]);
 		$table = TableRegistry::get('users');
-		$table->eventManager()->attach(function($ev, $en, $opt, $val) use ($entity) {
+		$table->eventManager()->attach(function ($ev, $en, $opt, $val) use ($entity) {
 			$this->assertSame($entity, $en);
 			$this->assertTrue($opt['crazy']);
 			$this->assertSame($ev->subject()->validator('default'), $val);
@@ -2125,7 +2151,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			'username' => 'superuser'
 		]);
 		$table = TableRegistry::get('users');
-		$table->eventManager()->attach(function($ev, $en) {
+		$table->eventManager()->attach(function ($ev, $en) {
 			$en->errors('username', 'Not good');
 			return false;
 		}, 'Model.beforeValidate');
@@ -2145,7 +2171,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		]);
 		$table = TableRegistry::get('users');
 		$table->validator()->validatePresence('password');
-		$table->eventManager()->attach(function($ev, $en, $opt, $val) use ($entity) {
+		$table->eventManager()->attach(function ($ev, $en, $opt, $val) use ($entity) {
 			$this->assertSame($entity, $en);
 			$this->assertTrue($opt['crazy']);
 			$this->assertSame($ev->subject()->validator('default'), $val);
@@ -2195,6 +2221,44 @@ class TableTest extends \Cake\TestSuite\TestCase {
 	}
 
 /**
+ * Tests that save validates all entities before persisting.
+ *
+ * @return void
+ */
+	public function testSaveValidateAllAssociations() {
+		$entity = new \Cake\ORM\Entity([
+			'title' => 'foo',
+			'author' => new \Cake\ORM\Entity([
+				'name' => 'Susan'
+			]),
+			'comments' => [
+				new \Cake\ORM\Entity([
+					'comment' => 'the worst!'
+				])
+			]
+		]);
+		$table = TableRegistry::get('Articles');
+		$table->belongsTo('Authors');
+		$table->hasMany('Comments');
+
+		$validator = (new Validator)->validatePresence('body');
+		$table->validator('default', $validator);
+
+		$authorValidate = (new Validator)->validatePresence('bio');
+		$table->Authors->validator('default', $authorValidate);
+
+		$commentValidate = (new Validator)->validatePresence('author');
+		$table->Comments->validator('default', $commentValidate);
+
+		$result = $table->save($entity);
+		$this->assertFalse($result, 'Should have failed');
+
+		$this->assertNotEmpty($entity->errors('body'), 'Missing article errors');
+		$this->assertNotEmpty($entity->author->errors('bio'), 'Missing author errors');
+		$this->assertNotEmpty($entity->comments[0]->errors('author'), 'Missing comment errors');
+	}
+
+/**
  * Test magic findByXX method.
  *
  * @return void
@@ -2212,7 +2276,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 /**
  * Test magic findByXX errors on missing arguments.
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException BadMethodCallException
  * @expectedExceptionMessage Not enough arguments to magic finder. Got 0 required 1
  * @return void
  */
@@ -2225,7 +2289,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 /**
  * Test magic findByXX errors on missing arguments.
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException BadMethodCallException
  * @expectedExceptionMessage Not enough arguments to magic finder. Got 1 required 2
  * @return void
  */
@@ -2238,7 +2302,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 /**
  * Test magic findByXX errors when there is a mix of or & and.
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException BadMethodCallException
  * @expectedExceptionMessage Cannot mix "and" & "or" in a magic finder. Use find() instead.
  * @return void
  */
@@ -2461,8 +2525,8 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		$table = TableRegistry::get('authors');
 		$table->hasOne('articles');
 
-		$this->assertSame($entity, $table->save($entity));
-		$this->assertFalse($entity->isNew());
+		$this->assertFalse($table->save($entity));
+		$this->assertTrue($entity->isNew());
 		$this->assertInternalType('array', $entity->article);
 	}
 
@@ -2599,14 +2663,15 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			->validator()
 			->add('title', 'num', ['rule' => 'numeric']);
 
-		$this->assertSame($entity, $table->save($entity, ['atomic' => false]));
-		$this->assertFalse($entity->isNew());
+		$result = $table->save($entity, ['atomic' => false]);
+		$this->assertFalse($result, 'Validation failed, no save.');
+		$this->assertTrue($entity->isNew());
 		$this->assertTrue($entity->articles[0]->isNew());
-		$this->assertFalse($entity->articles[1]->isNew());
-		$this->assertEquals(4, $entity->articles[1]->id);
+		$this->assertTrue($entity->articles[1]->isNew());
+		$this->assertNull($entity->articles[1]->id);
 		$this->assertNull($entity->articles[0]->id);
-		$this->assertEquals(5, $entity->articles[0]->author_id);
-		$this->assertEquals(5, $entity->articles[1]->author_id);
+		$this->assertNull($entity->articles[0]->author_id);
+		$this->assertNull($entity->articles[1]->author_id);
 	}
 
 /**
@@ -2632,8 +2697,9 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			->validator()
 			->add('title', 'num', ['rule' => 'numeric']);
 
-		$this->assertSame($entity, $table->save($entity, ['atomic' => false]));
-		$this->assertFalse($entity->isNew());
+		$result = $table->save($entity, ['atomic' => false]);
+		$this->assertFalse($result, 'Validation failed, no save.');
+		$this->assertTrue($entity->isNew());
 		$this->assertTrue($entity->article->isNew());
 		$this->assertNull($entity->article->id);
 		$this->assertNull($entity->article->get('author_id'));
@@ -2664,8 +2730,9 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			->validator()
 			->add('name', 'num', ['rule' => 'numeric']);
 
-		$this->assertSame($entity, $table->save($entity, ['atomic' => false]));
-		$this->assertFalse($entity->isNew());
+		$result = $table->save($entity, ['atomic' => false]);
+		$this->assertFalse($result, 'Validation failed, no save');
+		$this->assertTrue($entity->isNew());
 		$this->assertTrue($entity->author->isNew());
 		$this->assertNull($entity->get('author_id'));
 		$this->assertNotEmpty($entity->author->errors('name'));
@@ -2764,7 +2831,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
  * @group save
  * @return void
  */
-	public function testSaveBelongsToWithValidationErrorAtomic() {
+	public function testSaveBelongsToManyWithValidationErrorAtomic() {
 		$entity = new \Cake\ORM\Entity([
 			'title' => 'A Title',
 			'body' => 'A body'
@@ -2803,7 +2870,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
  * @group save
  * @return void
  */
-	public function testSaveBelongsToWithValidationErrorNonAtomic() {
+	public function testSaveBelongsToManyWithValidationErrorNonAtomic() {
 		$entity = new \Cake\ORM\Entity([
 			'title' => 'A Title',
 			'body' => 'A body'
@@ -2823,15 +2890,16 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			->validator()
 			->add('name', 'num', ['rule' => 'numeric']);
 
-		$this->assertSame($entity, $table->save($entity, ['atomic' => false]));
-		$this->assertFalse($entity->isNew());
+		$result = $table->save($entity, ['atomic' => false]);
+
+		$this->assertFalse($result, 'HABTM validation failed, save aborted');
+		$this->assertTrue($entity->isNew());
 		$this->assertTrue($entity->tags[0]->isNew());
-		$this->assertFalse($entity->tags[1]->isNew());
+		$this->assertTrue($entity->tags[1]->isNew());
 		$this->assertNull($entity->tags[0]->id);
-		$this->assertEquals(4, $entity->tags[1]->id);
+		$this->assertNull($entity->tags[1]->id);
 		$this->assertNull($entity->tags[0]->_joinData);
-		$this->assertEquals(4, $entity->tags[1]->_joinData->article_id);
-		$this->assertEquals(4, $entity->tags[1]->_joinData->tag_id);
+		$this->assertNull($entity->tags[1]->_joinData);
 	}
 
 /**
@@ -2840,7 +2908,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
  * @group save
  * @return void
  */
-	public function testSaveBelongsToWithValidationErrorInJointEntity() {
+	public function testSaveBelongsToManyWithValidationErrorInJointEntity() {
 		$entity = new \Cake\ORM\Entity([
 			'title' => 'A Title',
 			'body' => 'A body'
@@ -2877,7 +2945,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
  * @group save
  * @return void
  */
-	public function testSaveBelongsToWithValidationErrorInJointEntityNonAtomic() {
+	public function testSaveBelongsToManyWithValidationErrorInJointEntityNonAtomic() {
 		$entity = new \Cake\ORM\Entity([
 			'title' => 'A Title',
 			'body' => 'A body'
@@ -2946,9 +3014,6 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		$this->assertEquals(4, $tags[2]->id);
 		$this->assertEquals(1, $tags[2]->_joinData->article_id);
 		$this->assertEquals(4, $tags[2]->_joinData->tag_id);
-
-		$article = $table->find('all')->where(['id' => 1])->contain(['tags'])->first();
-		$this->assertEquals($tags, $article->tags);
 	}
 
 /**
@@ -3030,7 +3095,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		$this->assertSame($entity, $articles->save($entity, [
 			'associated' => [
 				'authors' => [
-					'validate' => 'special'
+					'validate' => true
 				],
 				'authors.supervisors' => [
 					'atomic' => false,
@@ -3245,13 +3310,22 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		$table->find();
 	}
 
+	public function providerForTestGet() {
+		return [
+			[ ['fields' => ['id']] ],
+			[ ['fields' => ['id'], 'cache' => false] ]
+		];
+	}
+
 /**
  * Test that get() will use the primary key for searching and return the first
  * entity found
  *
+ * @dataProvider providerForTestGet
+ * @param array $options
  * @return void
  */
-	public function testGet() {
+	public function testGet($options) {
 		$table = $this->getMock(
 			'\Cake\ORM\Table',
 			['callFinder', 'query'],
@@ -3267,7 +3341,7 @@ class TableTest extends \Cake\TestSuite\TestCase {
 
 		$query = $this->getMock(
 			'\Cake\ORM\Query',
-			['addDefaultTypes', 'first', 'where'],
+			['addDefaultTypes', 'first', 'where', 'cache'],
 			[$this->connection, $table]
 		);
 
@@ -3281,16 +3355,79 @@ class TableTest extends \Cake\TestSuite\TestCase {
 		$query->expects($this->once())->method('where')
 			->with([$table->alias() . '.bar' => 10])
 			->will($this->returnSelf());
+		$query->expects($this->never())->method('cache');
 		$query->expects($this->once())->method('first')
 			->will($this->returnValue($entity));
-		$result = $table->get(10, ['fields' => ['id']]);
+		$result = $table->get(10, $options);
+		$this->assertSame($entity, $result);
+	}
+
+	public function providerForTestGetWithCache() {
+		return [
+			[
+				['fields' => ['id'], 'cache' => 'default'],
+				'get:test.table_name[10]', 'default'
+			],
+			[
+				['fields' => ['id'], 'cache' => 'default', 'key' => 'custom_key'],
+				'custom_key', 'default'
+			]
+		];
+	}
+
+/**
+ * Test that get() will use the cache.
+ *
+ * @dataProvider providerForTestGetWithCache
+ * @param array $options
+ * @param string $cacheKey
+ * @param string $cacheConfig
+ * @return void
+ */
+	public function testGetWithCache($options, $cacheKey, $cacheConfig) {
+		$table = $this->getMock(
+			'\Cake\ORM\Table',
+			['callFinder', 'query'],
+			[[
+				'connection' => $this->connection,
+				'schema' => [
+					'id' => ['type' => 'integer'],
+					'bar' => ['type' => 'integer'],
+					'_constraints' => ['primary' => ['type' => 'primary', 'columns' => ['bar']]]
+				]
+			]]
+		);
+		$table->table('table_name');
+
+		$query = $this->getMock(
+			'\Cake\ORM\Query',
+			['addDefaultTypes', 'first', 'where', 'cache'],
+			[$this->connection, $table]
+		);
+
+		$entity = new \Cake\ORM\Entity;
+		$table->expects($this->once())->method('query')
+			->will($this->returnValue($query));
+		$table->expects($this->once())->method('callFinder')
+			->with('all', $query, ['fields' => ['id']])
+			->will($this->returnValue($query));
+
+		$query->expects($this->once())->method('where')
+			->with([$table->alias() . '.bar' => 10])
+			->will($this->returnSelf());
+		$query->expects($this->once())->method('cache')
+			->with($cacheKey, $cacheConfig)
+			->will($this->returnSelf());
+		$query->expects($this->once())->method('first')
+			->will($this->returnValue($entity));
+		$result = $table->get(10, $options);
 		$this->assertSame($entity, $result);
 	}
 
 /**
  * Tests that get() will throw an exception if the record was not found
  *
- * @expectedException \Cake\ORM\Error\RecordNotFoundException
+ * @expectedException \Cake\ORM\Exception\RecordNotFoundException
  * @expectedExceptionMessage Record "10" not found in table "articles"
  * @return void
  */
@@ -3486,6 +3623,65 @@ class TableTest extends \Cake\TestSuite\TestCase {
 			'connectionName' => 'test'
 		];
 		$this->assertEquals($expected, $result);
+	}
+
+/**
+ * Test the findOrCreate method.
+ *
+ * @return void
+ */
+	public function testFindOrCreate() {
+		$articles = TableRegistry::get('Articles');
+
+		$article = $articles->findOrCreate(['title' => 'Not there'], function ($article) {
+			$article->body = 'New body';
+		});
+		$this->assertFalse($article->isNew());
+		$this->assertNotNull($article->id);
+		$this->assertEquals('Not there', $article->title);
+		$this->assertEquals('New body', $article->body);
+
+		$article = $articles->findOrCreate(['title' => 'Not there']);
+		$this->assertFalse($article->isNew());
+		$this->assertNotNull($article->id);
+		$this->assertEquals('Not there', $article->title);
+
+		$article = $articles->findOrCreate(['title' => 'First Article'], function ($article) {
+			$this->fail('Should not be called for existing entities.');
+		});
+		$this->assertFalse($article->isNew());
+		$this->assertNotNull($article->id);
+		$this->assertEquals('First Article', $article->title);
+
+		$article = $articles->findOrCreate(
+			['author_id' => 2, 'title' => 'First Article'],
+			function ($article) {
+				$article->set(['published' => 'N', 'body' => 'New body']);
+			}
+		);
+		$this->assertFalse($article->isNew());
+		$this->assertNotNull($article->id);
+		$this->assertEquals('First Article', $article->title);
+		$this->assertEquals('New body', $article->body);
+		$this->assertEquals('N', $article->published);
+		$this->assertEquals(2, $article->author_id);
+	}
+
+/**
+ * Test that creating a table fires the initialize event.
+ *
+ * @return void
+ */
+	public function testInitializeEvent() {
+		$count = 0;
+		$cb = function ($event) use (&$count){
+			$count++;
+		};
+		EventManager::instance()->attach($cb, 'Model.initialize');
+		$articles = TableRegistry::get('Articles');
+
+		$this->assertEquals(1, $count, 'Callback should be called');
+		EventManager::instance()->detach($cb, 'Model.initialize');
 	}
 
 }

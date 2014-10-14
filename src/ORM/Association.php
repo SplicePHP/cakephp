@@ -14,9 +14,9 @@
  */
 namespace Cake\ORM;
 
+use Cake\Core\ConventionsTrait;
 use Cake\Database\Expression\IdentifierExpression;
 use Cake\Datasource\ResultSetDecorator;
-use Cake\Event\Event;
 use Cake\ORM\Entity;
 use Cake\ORM\Query;
 use Cake\ORM\Table;
@@ -29,6 +29,8 @@ use Cake\Utility\Inflector;
  *
  */
 abstract class Association {
+
+	use ConventionsTrait;
 
 /**
  * Strategy name to use joins for fetching associated records
@@ -387,7 +389,7 @@ abstract class Association {
 
 /**
  * Sets the default finder to use for fetching rows from the target table.
- * If no parameters are passed, it will reeturn the currently configured
+ * If no parameters are passed, it will return the currently configured
  * finder name.
  *
  * @param string $finder the finder name to use
@@ -430,6 +432,7 @@ abstract class Association {
  * - propertyPath: A dot separated string representing the path of association
  *   properties to be followed from the passed query main entity to this
  *   association
+ * - joinType: The SQL join type to use in the query.
  *
  * @param Query $query the query to be altered to include the target table data
  * @param array $options Any extra options or overrides to be taken in account
@@ -439,13 +442,15 @@ abstract class Association {
  */
 	public function attachTo(Query $query, array $options = []) {
 		$target = $this->target();
+		$joinType = empty($options['joinType']) ? $this->joinType() : $options['joinType'];
 		$options += [
 			'includeFields' => true,
 			'foreignKey' => $this->foreignKey(),
 			'conditions' => [],
 			'fields' => [],
-			'type' => empty($options['matching']) ? $this->joinType() : 'INNER',
-			'table' => $target->table()
+			'type' => empty($options['matching']) ? $joinType : 'INNER',
+			'table' => $target->table(),
+			'finder' => $this->finder()
 		];
 
 		if (!empty($options['foreignKey'])) {
@@ -455,7 +460,10 @@ abstract class Association {
 			}
 		}
 
-		$dummy = $this->find()->eagerLoaded(true);
+		list($finder, $opts) = $this->_extractFinder($options['finder']);
+		$dummy = $this
+			->find($finder, $opts)
+			->eagerLoaded(true);
 		if (!empty($options['queryBuilder'])) {
 			$dummy = $options['queryBuilder']($dummy);
 			if (!($dummy instanceof Query)) {
@@ -530,8 +538,9 @@ abstract class Association {
  */
 	public function find($type = null, array $options = []) {
 		$type = $type ?: $this->finder();
+		list($type, $opts) = $this->_extractFinder($type, $options);
 		return $this->target()
-			->find($type, $options)
+			->find($type, $options + $opts)
 			->where($this->conditions());
 	}
 
@@ -580,8 +589,7 @@ abstract class Association {
 	protected function _dispatchBeforeFind($query) {
 		$table = $this->target();
 		$options = $query->getOptions();
-		$event = new Event('Model.beforeFind', $table, [$query, $options, false]);
-		$table->eventManager()->dispatch($event);
+		$table->dispatchEvent('Model.beforeFind', [$query, $options, false]);
 	}
 
 /**
@@ -594,17 +602,21 @@ abstract class Association {
  * @return void
  */
 	protected function _appendFields($query, $surrogate, $options) {
-		$options['fields'] = $surrogate->clause('select') ?: $options['fields'];
+		$fields = $surrogate->clause('select') ?: $options['fields'];
 		$target = $this->_targetTable;
-		if (empty($options['fields'])) {
-			$f = isset($options['fields']) ? $options['fields'] : null;
-			if ($options['includeFields'] && ($f === null || $f !== false)) {
-				$options['fields'] = $target->schema()->columns();
+		$autoFields = $surrogate->autoFields();
+		if (empty($fields) && !$autoFields) {
+			if ($options['includeFields'] && ($fields === null || $fields !== false)) {
+				$fields = $target->schema()->columns();
 			}
 		}
 
-		if (!empty($options['fields'])) {
-			$query->select($query->aliasFields($options['fields'], $target->alias()));
+		if ($autoFields === true) {
+			$fields = array_merge((array)$fields, $target->schema()->columns());
+		}
+
+		if (!empty($fields)) {
+			$query->select($query->aliasFields($fields, $target->alias()));
 		}
 	}
 
@@ -629,7 +641,7 @@ abstract class Association {
 		}
 
 		$property = $options['propertyPath'];
-		$query->formatResults(function($results) use ($formatters, $property) {
+		$query->formatResults(function ($results) use ($formatters, $property) {
 			$extracted = $results->extract($property)->compile();
 			foreach ($formatters as $callable) {
 				$extracted = new ResultSetDecorator($callable($extracted));
@@ -701,6 +713,32 @@ abstract class Association {
 		}
 
 		return $conditions;
+	}
+
+/**
+ * Helper method to infer the requested finder and its options.
+ *
+ * Returns the inferred options from the finder $type.
+ *
+ * ### Examples:
+ *
+ * The following will call the finder 'translations' with the value of the finder as its options:
+ * $query->contain(['Comments' => ['finder' => ['translations']]]);
+ * $query->contain(['Comments' => ['finder' => ['translations' => []]]]);
+ * $query->contain(['Comments' => ['finder' => ['translations' => ['locales' => ['en_US']]]]]);
+ *
+ * @param string|array $finderData The finder name or an array having the name as key
+ * and options as value.
+ * @return array
+ */
+	protected function _extractFinder($finderData) {
+		$finderData = (array)$finderData;
+
+		if (is_numeric(key($finderData))) {
+			return [current($finderData), []];
+		}
+
+		return [key($finderData), current($finderData)];
 	}
 
 /**

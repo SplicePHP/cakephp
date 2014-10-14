@@ -14,10 +14,10 @@
  */
 namespace Cake\TestSuite\Fixture;
 
+use Cake\Core\Exception\Exception;
 use Cake\Database\Connection;
 use Cake\Database\Schema\Table;
 use Cake\Datasource\ConnectionManager;
-use Cake\Error;
 use Cake\Log\Log;
 use Cake\Utility\Inflector;
 
@@ -87,7 +87,7 @@ class TestFixture {
 /**
  * Instantiate the fixture.
  *
- * @throws \Cake\Error\Exception on invalid datasource usage.
+ * @throws \Cake\Core\Exception\Exception on invalid datasource usage.
  */
 	public function __construct() {
 		$connection = 'test';
@@ -99,7 +99,7 @@ class TestFixture {
 					$connection,
 					$this->name
 				);
-				throw new Error\Exception($message);
+				throw new Exception($message);
 			}
 		}
 		$this->init();
@@ -119,7 +119,7 @@ class TestFixture {
 			if (isset($matches[1])) {
 				$table = $matches[1];
 			}
-			$this->table = Inflector::tableize(Inflector::pluralize($table));
+			$this->table = Inflector::tableize($table);
 		}
 
 		if (empty($this->import) && !empty($this->fields)) {
@@ -175,7 +175,7 @@ class TestFixture {
  * Build fixture schema from a table in another datasource.
  *
  * @return void
- * @throws \Cake\Error\Exception when trying to import from an empty table.
+ * @throws \Cake\Core\Exception\Exception when trying to import from an empty table.
  */
 	protected function _schemaFromImport() {
 		if (!is_array($this->import)) {
@@ -187,7 +187,7 @@ class TestFixture {
 		);
 
 		if (empty($import['table'])) {
-			throw new Error\Exception('Cannot import from undefined table.');
+			throw new Exception('Cannot import from undefined table.');
 		} else {
 			$this->table = $import['table'];
 		}

@@ -15,7 +15,6 @@
 namespace Cake\Database\Type;
 
 use Cake\Database\Driver;
-use Cake\Error;
 use PDO;
 
 /**
@@ -36,7 +35,7 @@ class IntegerType extends \Cake\Database\Type {
 		if ($value === null || $value === '') {
 			return null;
 		}
-		return intval($value);
+		return (int)$value;
 	}
 
 /**
@@ -45,13 +44,13 @@ class IntegerType extends \Cake\Database\Type {
  * @param null|string|resource $value The value to convert.
  * @param Driver $driver The driver instance to convert with.
  * @return resource
- * @throws \Cake\Error\Exception
+ * @throws \Cake\Core\Exception\Exception
  */
 	public function toPHP($value, Driver $driver) {
 		if ($value === null) {
 			return null;
 		}
-		return intval($value);
+		return (int)$value;
 	}
 
 /**
@@ -75,7 +74,7 @@ class IntegerType extends \Cake\Database\Type {
 		if ($value === null || $value === '') {
 			return null;
 		}
-		return intval($value);
+		return (int)$value;
 	}
 
 }

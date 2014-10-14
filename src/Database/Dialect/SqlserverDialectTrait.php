@@ -156,7 +156,7 @@ trait SqlserverDialectTrait {
 				break;
 			case 'DATEDIFF':
 				$hasDay = false;
-				$visitor = function($value) use (&$hasDay){
+				$visitor = function ($value) use (&$hasDay) {
 					if ($value === 'day') {
 						$hasDay = true;
 					}
@@ -231,6 +231,20 @@ trait SqlserverDialectTrait {
  */
 	public function newCompiler() {
 		return new SqlserverCompiler();
+	}
+
+/**
+ * {@inheritDoc}
+ */
+	public function disableForeignKeySQL() {
+		return 'EXEC sp_msforeachtable "ALTER TABLE ? NOCHECK CONSTRAINT all"';
+	}
+
+/**
+ * {@inheritDoc}
+ */
+	public function enableForeignKeySQL() {
+		return 'EXEC sp_msforeachtable "ALTER TABLE ? WITH CHECK CHECK CONSTRAINT all"';
 	}
 
 }

@@ -684,7 +684,7 @@ class RequestTest extends TestCase {
 /**
  * Test __call exceptions
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException BadMethodCallException
  * @return void
  */
 	public function testMagicCallExceptionOnUnknownMethod() {
@@ -698,36 +698,27 @@ class RequestTest extends TestCase {
  * @return void
  */
 	public function testIsSsl() {
-		$_SERVER['HTTPS'] = 1;
 		$request = new Request();
+
+		$request->env('HTTPS', 1);
 		$this->assertTrue($request->is('ssl'));
 
-		$_SERVER['HTTPS'] = 'on';
-		$request = new Request();
+		$request->env('HTTPS', 'on');
 		$this->assertTrue($request->is('ssl'));
 
-		$_SERVER['HTTPS'] = '1';
-		$request = new Request();
+		$request->env('HTTPS', '1');
 		$this->assertTrue($request->is('ssl'));
 
-		$_SERVER['HTTPS'] = 'I am not empty';
-		$request = new Request();
-		$this->assertTrue($request->is('ssl'));
-
-		$_SERVER['HTTPS'] = 1;
-		$request = new Request();
-		$this->assertTrue($request->is('ssl'));
-
-		$_SERVER['HTTPS'] = 'off';
-		$request = new Request();
+		$request->env('HTTPS', 'I am not empty');
 		$this->assertFalse($request->is('ssl'));
 
-		$_SERVER['HTTPS'] = false;
-		$request = new Request();
+		$request->env('HTTPS', 'off');
 		$this->assertFalse($request->is('ssl'));
 
-		$_SERVER['HTTPS'] = '';
-		$request = new Request();
+		$request->env('HTTPS', false);
+		$this->assertFalse($request->is('ssl'));
+
+		$request->env('HTTPS', '');
 		$this->assertFalse($request->is('ssl'));
 	}
 
@@ -1200,7 +1191,7 @@ class RequestTest extends TestCase {
 
 		Configure::write('App', array(
 			'dir' => APP_DIR,
-			'webroot' => WEBROOT_DIR,
+			'webroot' => 'webroot',
 			'base' => false,
 			'baseUrl' => '/cake/index.php'
 		));
@@ -2238,7 +2229,7 @@ XML;
 			$this->assertEquals(array('Allow' => 'POST, DELETE'), $e->responseHeader());
 		}
 
-		$this->setExpectedException('Cake\Error\MethodNotAllowedException');
+		$this->setExpectedException('Cake\Network\Exception\MethodNotAllowedException');
 		$request->allowMethod('POST');
 	}
 

@@ -15,7 +15,7 @@
 namespace Cake\Log\Engine;
 
 use Cake\Console\ConsoleOutput;
-use Cake\Error;
+use InvalidArgumentException;
 
 /**
  * Console logging. Writes logs to console output.
@@ -52,10 +52,13 @@ class ConsoleLog extends BaseLog {
  * - `outputAs` integer or ConsoleOutput::[RAW|PLAIN|COLOR]
  *
  * @param array $config Options for the FileLog, see above.
- * @throws \Cake\Error\Exception
+ * @throws \InvalidArgumentException
  */
 	public function __construct(array $config = array()) {
-		if (DS === '\\' && !(bool)env('ANSICON')) {
+		if (
+			(DS === '\\' && !(bool)env('ANSICON')) ||
+			(function_exists('posix_isatty') && !posix_isatty($this->_output))
+		) {
 			$this->_defaultConfig['outputAs'] = ConsoleOutput::PLAIN;
 		} else {
 			$this->_defaultConfig['outputAs'] = ConsoleOutput::COLOR;
@@ -69,7 +72,7 @@ class ConsoleLog extends BaseLog {
 		} elseif (is_string($config['stream'])) {
 			$this->_output = new ConsoleOutput($config['stream']);
 		} else {
-			throw new Error\Exception('`stream` not a ConsoleOutput nor string');
+			throw new InvalidArgumentException('`stream` not a ConsoleOutput nor string');
 		}
 		$this->_output->outputAs($config['outputAs']);
 	}
@@ -79,11 +82,11 @@ class ConsoleLog extends BaseLog {
  *
  * @param string $level The severity level of log you are making.
  * @param string $message The message you want to log.
- * @param string|array $scope The scope(s) a log message is being created in.
- *    See Cake\Log\Log::config() for more information on logging scopes.
+ * @param array $context Additional information about the logged message
  * @return bool success of write.
  */
-	public function write($level, $message, $scope = []) {
+	public function log($level, $message, array $context = []) {
+		$message = $this->_format($message, $context);
 		$output = date('Y-m-d H:i:s') . ' ' . ucfirst($level) . ': ' . $message . "\n";
 		return $this->_output->write(sprintf('<%s>%s</%s>', $level, $output, $level), false);
 	}

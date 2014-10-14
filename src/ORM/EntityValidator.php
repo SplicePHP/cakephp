@@ -14,8 +14,6 @@
  */
 namespace Cake\ORM;
 
-use Cake\Event\Event;
-
 /**
  * Contains logic for validating entities and their associations
  *
@@ -82,6 +80,7 @@ class EntityValidator {
  */
 	public function one(Entity $entity, $options = []) {
 		$valid = true;
+		$types = [Association::ONE_TO_ONE, Association::MANY_TO_ONE];
 		$propertyMap = $this->_buildPropertyMap($options);
 
 		foreach ($propertyMap as $key => $assoc) {
@@ -91,10 +90,14 @@ class EntityValidator {
 			if (!$value) {
 				continue;
 			}
+			$isOne = in_array($association->type(), $types);
+			if ($isOne && !($value instanceof Entity)) {
+				$valid = false;
+				continue;
+			}
 
 			$validator = $association->target()->entityValidator();
-			$types = [Association::ONE_TO_ONE, Association::MANY_TO_ONE];
-			if (in_array($association->type(), $types)) {
+			if ($isOne) {
 				$valid = $validator->one($value, $assoc['options']) && $valid;
 			} else {
 				$valid = $validator->many($value, $assoc['options']) && $valid;
@@ -104,7 +107,6 @@ class EntityValidator {
 		if (!isset($options['validate'])) {
 			$options['validate'] = true;
 		}
-
 		return $this->_processValidation($entity, $options) && $valid;
 	}
 
@@ -138,8 +140,7 @@ class EntityValidator {
 		$type = is_string($options['validate']) ? $options['validate'] : 'default';
 		$validator = $this->_table->validator($type);
 		$pass = compact('entity', 'options', 'validator');
-		$event = new Event('Model.beforeValidate', $this->_table, $pass);
-		$this->_table->eventManager()->dispatch($event);
+		$event = $this->_table->dispatchEvent('Model.beforeValidate', $pass);
 
 		if ($event->isStopped()) {
 			return (bool)$event->result;
@@ -151,8 +152,7 @@ class EntityValidator {
 
 		$success = $entity->validate($validator);
 
-		$event = new Event('Model.afterValidate', $this->_table, $pass);
-		$this->_table->eventManager()->dispatch($event);
+		$event = $this->_table->dispatchEvent('Model.afterValidate', $pass);
 
 		if ($event->isStopped()) {
 			$success = (bool)$event->result;

@@ -26,7 +26,7 @@ use Cake\TestSuite\TestCase;
  */
 class QueryTest extends TestCase {
 
-	public $fixtures = ['core.article', 'core.author', 'core.comment'];
+	public $fixtures = ['core.articles', 'core.authors', 'core.comments'];
 
 	const ARTICLE_COUNT = 3;
 	const AUTHOR_COUNT = 4;
@@ -86,7 +86,7 @@ class QueryTest extends TestCase {
 	public function testSelectClosure() {
 		$this->connection->driver()->autoQuoting(false);
 		$query = new Query($this->connection);
-		$result = $query->select(function($q) use ($query) {
+		$result = $query->select(function ($q) use ($query) {
 			$this->assertSame($query, $q);
 			return ['1 + 2', '1 + 5'];
 		})->execute();
@@ -371,7 +371,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title', 'name' => 'c.comment'])
 			->from('articles')
-			->innerJoin(['c' => 'comments'], function($exp, $q) use ($query, $types) {
+			->innerJoin(['c' => 'comments'], function ($exp, $q) use ($query, $types) {
 				$this->assertSame($q, $query);
 				$exp->add(['created <' => new \DateTime('2007-03-18 10:45:23')], $types);
 				return $exp;
@@ -384,7 +384,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title', 'name' => 'comments.comment'])
 			->from('articles')
-			->innerJoin('comments', function($exp, $q) use ($query, $types) {
+			->innerJoin('comments', function ($exp, $q) use ($query, $types) {
 				$this->assertSame($q, $query);
 				$exp->add(['created >' => new \DateTime('2007-03-18 10:45:23')], $types);
 				return $exp;
@@ -731,7 +731,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->eq('id', 1);
 			})
 			->execute();
@@ -742,7 +742,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp
 					->eq('id', 1)
 					->eq('created', new \DateTime('2007-03-18 10:45:23'), 'datetime');
@@ -755,7 +755,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp
 					->eq('id', 1)
 					->eq('created', new \DateTime('2021-12-30 15:00'), 'datetime');
@@ -776,7 +776,7 @@ class QueryTest extends TestCase {
 			->where([
 				'OR' => [
 					'id' => 1,
-					function($exp) {
+					function ($exp) {
 						return $exp->eq('id', 2);
 					}
 				]
@@ -802,7 +802,7 @@ class QueryTest extends TestCase {
 			->select(['id'])
 			->from('comments')
 			->where(['id' => '1'])
-			->andWhere(function($exp) {
+			->andWhere(function ($exp) {
 				return $exp->eq('created', new \DateTime('2007-03-18 10:45:23'), 'datetime');
 			})
 			->execute();
@@ -814,7 +814,7 @@ class QueryTest extends TestCase {
 			->select(['id'])
 			->from('comments')
 			->where(['id' => '1'])
-			->andWhere(function($exp) {
+			->andWhere(function ($exp) {
 				return $exp->eq('created', new \DateTime('2022-12-21 12:00'), 'datetime');
 			})
 			->execute();
@@ -833,7 +833,7 @@ class QueryTest extends TestCase {
 			->select(['id'])
 			->from('comments')
 			->where(['id' => '1'])
-			->orWhere(function($exp) {
+			->orWhere(function ($exp) {
 				return $exp->eq('created', new \DateTime('2007-03-18 10:47:23'), 'datetime');
 			})
 			->execute();
@@ -846,7 +846,7 @@ class QueryTest extends TestCase {
 			->select(['id'])
 			->from('comments')
 			->where(['id' => '1'])
-			->orWhere(function($exp) {
+			->orWhere(function ($exp) {
 				return $exp
 					->eq('created', new \DateTime('2012-12-22 12:00'), 'datetime')
 					->eq('id', 3);
@@ -867,7 +867,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				$field = clone $exp;
 				$field->add('SELECT min(id) FROM comments');
 				return $exp
@@ -887,7 +887,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->gt('id', 1);
 			})
 			->execute();
@@ -897,7 +897,7 @@ class QueryTest extends TestCase {
 		$query = new Query($this->connection);
 		$result = $query->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->lt('id', 2);
 			})
 			->execute();
@@ -907,7 +907,7 @@ class QueryTest extends TestCase {
 		$query = new Query($this->connection);
 		$result = $query->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->lte('id', 2);
 			})
 			->execute();
@@ -917,7 +917,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->gte('id', 1);
 			})
 			->execute();
@@ -927,7 +927,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->lte('id', 1);
 			})
 			->execute();
@@ -937,7 +937,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->notEq('id', 2);
 			})
 			->execute();
@@ -948,7 +948,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->like('title', 'First Article');
 			})
 			->execute();
@@ -959,7 +959,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->like('title', '%Article%');
 			})
 			->execute();
@@ -969,7 +969,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['title'])
 			->from('articles')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->notLike('title', '%Article%');
 			})
 			->execute();
@@ -979,7 +979,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->isNull('published');
 			})
 			->execute();
@@ -989,7 +989,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->isNotNull('published');
 			})
 			->execute();
@@ -999,7 +999,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->in('published', ['Y', 'N']);
 			})
 			->execute();
@@ -1009,7 +1009,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->in(
 					'created',
 					[new \DateTime('2007-03-18 10:45:23'), new \DateTime('2007-03-18 10:47:23')],
@@ -1025,7 +1025,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->notIn(
 					'created',
 					[new \DateTime('2007-03-18 10:45:23'), new \DateTime('2007-03-18 10:47:23')],
@@ -1047,7 +1047,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->in('created', '2007-03-18 10:45:23', 'datetime');
 			})
 			->execute();
@@ -1058,7 +1058,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->notIn('created', '2007-03-18 10:45:23', 'datetime');
 			})
 			->execute();
@@ -1072,7 +1072,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp, $q) {
+			->where(function ($exp, $q) {
 				return $exp->in(
 					'created',
 					$q->newExpr("'2007-03-18 10:45:23'"),
@@ -1087,7 +1087,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp, $q) {
+			->where(function ($exp, $q) {
 				return $exp->notIn(
 					'created',
 					$q->newExpr("'2007-03-18 10:45:23'"),
@@ -1132,7 +1132,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				$and = $exp->and_(['id' => 2, 'id >' => 1]);
 				return $exp->add($and);
 			})
@@ -1144,7 +1144,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				$and = $exp->and_(['id' => 2, 'id <' => 2]);
 				return $exp->add($and);
 			})
@@ -1155,8 +1155,8 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
-				$and = $exp->and_(function($and) {
+			->where(function ($exp) {
+				$and = $exp->and_(function ($and) {
 					return $and->eq('id', 1)->gt('id', 0);
 				});
 				return $exp->add($and);
@@ -1169,7 +1169,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				$or = $exp->or_(['id' => 1]);
 				$and = $exp->and_(['id >' => 2, 'id <' => 4]);
 				return $or->add($and);
@@ -1183,8 +1183,8 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
-				$or = $exp->or_(function($or) {
+			->where(function ($exp) {
+				$or = $exp->or_(function ($or) {
 					return $or->eq('id', 1)->eq('id', 2);
 				});
 				return $or;
@@ -1206,7 +1206,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->not(
 					$exp->and_(['id' => 2, 'created' => new \DateTime('2007-03-18 10:47:23')], ['created' => 'datetime'])
 				);
@@ -1220,7 +1220,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['id'])
 			->from('comments')
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->not(
 					$exp->and_(['id' => 2, 'created' => new \DateTime('2012-12-21 12:00')], ['created' => 'datetime'])
 				);
@@ -1443,7 +1443,7 @@ class QueryTest extends TestCase {
 		$expected = [['total' => 2, 'author_id' => 1]];
 		$this->assertEquals($expected, $result->fetchAll('assoc'));
 
-		$result = $query->having(function($e) {
+		$result = $query->having(function ($e) {
 			return $e->add('count(author_id) = 1 + 1');
 		}, [], true)
 			->execute();
@@ -1489,7 +1489,7 @@ class QueryTest extends TestCase {
 			->join(['table' => 'authors', 'alias' => 'a', 'conditions' => 'author_id = a.id'])
 			->group('author_id')
 			->having(['count(author_id) >' => 2], ['count(author_id)' => 'integer'])
-			->orHaving(function($e) {
+			->orHaving(function ($e) {
 				return $e->add('count(author_id) = 1 + 1');
 			})
 			->execute();
@@ -1533,7 +1533,7 @@ class QueryTest extends TestCase {
 			->from('articles')
 			->join(['table' => 'authors', 'alias' => 'a', 'conditions' => 'author_id = a.id'])
 			->group('author_id')
-			->andHaving(function($e) {
+			->andHaving(function ($e) {
 				return $e->add('count(author_id) = 2 - 1');
 			})
 			->execute();
@@ -1621,9 +1621,15 @@ class QueryTest extends TestCase {
 		$result = $query->select('id')->from('comments')
 			->limit(1)
 			->page(2)
+			->order(['id' => 'asc'])
 			->execute();
 		$this->assertCount(1, $result);
 		$this->assertEquals(['id' => 2], $result->fetch('assoc'));
+
+		$query = new Query($this->connection);
+		$query->select('id')->from('comments')->page(3, 10);
+		$this->assertEquals(10, $query->clause('limit'));
+		$this->assertEquals(20, $query->clause('offset'));
 
 		$query = new Query($this->connection);
 		$query->select('id')->from('comments')->page(1);
@@ -1847,7 +1853,7 @@ class QueryTest extends TestCase {
 			->select(['id', 'title'])
 			->from('articles')
 			->order(['id' => 'ASC'])
-			->decorateResults(function($row) {
+			->decorateResults(function ($row) {
 				$row['modified_id'] = $row['id'] + 1;
 				return $row;
 			})
@@ -1857,7 +1863,7 @@ class QueryTest extends TestCase {
 			$this->assertEquals($row['id'] + 1, $row['modified_id']);
 		}
 
-		$result = $query->decorateResults(function($row) {
+		$result = $query->decorateResults(function ($row) {
 			$row['modified_id']--;
 			return $row;
 		})->execute();
@@ -1867,7 +1873,7 @@ class QueryTest extends TestCase {
 		}
 
 		$result = $query
-			->decorateResults(function($row) {
+			->decorateResults(function ($row) {
 				$row['foo'] = 'bar';
 				return $row;
 			}, true)
@@ -2124,7 +2130,7 @@ class QueryTest extends TestCase {
 		$result = $query->sql();
 		$this->assertQuotedQuery(
 			'INSERT INTO <articles> \(<title>, <body>\) ' .
-			'VALUES \(\?, \?\)',
+			'VALUES \(:c0, :c1\)',
 			$result,
 			true
 		);
@@ -2160,7 +2166,7 @@ class QueryTest extends TestCase {
 		$result = $query->sql();
 		$this->assertQuotedQuery(
 			'INSERT INTO <articles> \(<title>, <body>\) ' .
-			'VALUES \(\?, \?\)',
+			'VALUES \(:c0, :c1\)',
 			$result,
 			true
 		);
@@ -2289,6 +2295,33 @@ class QueryTest extends TestCase {
 	}
 
 /**
+ * Test that insert can use expression objects as values.
+ *
+ * @return void
+ */
+	public function testInsertExpressionValues() {
+		$query = new Query($this->connection);
+		$query->insert(['title'])
+			->into('articles')
+			->values(['title' => $query->newExpr("SELECT 'jose'")]);
+
+		$result = $query->execute();
+		$this->assertCount(1, $result);
+
+		$subquery = new Query($this->connection);
+		$subquery->select(['name'])
+			->from('authors')
+			->where(['id' => 1]);
+
+		$query = new Query($this->connection);
+		$query->insert(['title'])
+			->into('articles')
+			->values(['title' => $subquery]);
+		$result = $query->execute();
+		$this->assertCount(1, $result);
+	}
+
+/**
  * Tests that functions are correctly transformed and their parameters are bound
  *
  * @group FunctionExpression
@@ -2297,7 +2330,7 @@ class QueryTest extends TestCase {
 	public function testSQLFunctions() {
 		$query = new Query($this->connection);
 		$result = $query->select(
-				function($q) {
+				function ($q) {
 					return ['total' => $q->func()->count('*')];
 				}
 			)
@@ -2527,11 +2560,11 @@ class QueryTest extends TestCase {
 
 		$query = new Query($this->connection);
 		$sql = $query->select('*')->from(['foo' => 'something'])->sql();
-		$this->assertQuotedQuery('FROM <something> AS <foo>$', $sql);
+		$this->assertQuotedQuery('FROM <something> <foo>$', $sql);
 
 		$query = new Query($this->connection);
 		$sql = $query->select('*')->from(['foo' => $query->newExpr('bar')])->sql();
-		$this->assertQuotedQuery('FROM \(bar\) AS <foo>$', $sql);
+		$this->assertQuotedQuery('FROM \(bar\) <foo>$', $sql);
 	}
 
 /**
@@ -2698,7 +2731,7 @@ class QueryTest extends TestCase {
 		$result = $query
 			->select(['name'])
 			->from(['authors'])
-			->where(function($exp) use ($subquery) {
+			->where(function ($exp) use ($subquery) {
 				return $exp->isNotNull($subquery);
 			})
 			->execute();
@@ -2707,7 +2740,7 @@ class QueryTest extends TestCase {
 		$result = (new Query($this->connection))
 			->select(['name'])
 			->from(['authors'])
-			->where(function($exp) use ($subquery) {
+			->where(function ($exp) use ($subquery) {
 				return $exp->isNull($subquery);
 			})
 			->execute();
@@ -2723,13 +2756,13 @@ class QueryTest extends TestCase {
 	public function testIsNullAutoQuoting() {
 		$this->connection->driver()->autoQuoting(true);
 		$query = new Query($this->connection);
-		$query->select('*')->from('things')->where(function($exp) {
+		$query->select('*')->from('things')->where(function ($exp) {
 			return $exp->isNull('field');
 		});
 		$this->assertQuotedQuery('WHERE \(<field>\) IS NULL', $query->sql());
 
 		$query = new Query($this->connection);
-		$query->select('*')->from('things')->where(function($exp) {
+		$query->select('*')->from('things')->where(function ($exp) {
 			return $exp->isNotNull('field');
 		});
 		$this->assertQuotedQuery('WHERE \(<field>\) IS NOT NULL', $query->sql());

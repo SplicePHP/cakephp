@@ -13,10 +13,10 @@
  */
 namespace Cake\Test\TestCase\Database\Expression;
 
+use Cake\Database\Expression\CaseExpression;
 use Cake\Database\Expression\QueryExpression;
 use Cake\Database\ValueBinder;
 use Cake\TestSuite\TestCase;
-use Cake\Database\Expression\CaseExpression;
 
 /**
  * Tests CaseExpression class
@@ -53,7 +53,7 @@ class CaseExpressionTest extends TestCase {
  */
 	public function testTraverse() {
 		$count = 0;
-		$visitor = function() use (&$count) {
+		$visitor = function () use (&$count) {
 			$count++;
 		};
 

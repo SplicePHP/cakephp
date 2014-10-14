@@ -17,8 +17,6 @@ namespace Cake\Datasource;
 use Cake\Collection\Iterator\MapReduce;
 use Cake\Datasource\QueryCacher;
 use Cake\Datasource\RepositoryInterface;
-use Cake\Datasource\ResultSetDecorator;
-use Cake\Event\Event;
 
 /**
  * Contains the characteristics for an object that is attached to a repository and
@@ -39,7 +37,7 @@ trait QueryTrait {
  *
  * When set, query execution will be bypassed.
  *
- * @var \Cake\Datasource\ResultSetDecorator
+ * @var \Cake\Datasource\ResultSetInterface
  * @see setResult()
  */
 	protected $_results;
@@ -109,7 +107,7 @@ trait QueryTrait {
  *
  * This method is most useful when combined with results stored in a persistent cache.
  *
- * @param \Cake\ORM\ResultSet $results The results this query should return.
+ * @param \Cake\Datasource\ResultSetInterface $results The results this query should return.
  * @return \Cake\ORM\Query The query instance.
  */
 	public function setResult($results) {
@@ -146,7 +144,7 @@ trait QueryTrait {
  * $query->cache('my_key', 'db_results');
  *
  * // Function to generate key.
- * $query->cache(function($q) {
+ * $query->cache(function ($q) {
  *   $key = serialize($q->clause('select'));
  *   $key .= serialize($q->clause('where'));
  *   return md5($key);
@@ -195,10 +193,10 @@ trait QueryTrait {
  * Will return either the results set through setResult(), or execute this query
  * and return the ResultSetDecorator object ready for streaming of results.
  *
- * ResultSetDecorator is a travesable object that implements the methods found
+ * ResultSetDecorator is a traversable object that implements the methods found
  * on Cake\Collection\Collection.
  *
- * @return \Cake\DataSource\ResultSetDecorator
+ * @return \Cake\Datasource\ResultSetInterface
  */
 	public function all() {
 		if (isset($this->_results)) {
@@ -206,8 +204,7 @@ trait QueryTrait {
 		}
 
 		$table = $this->repository();
-		$event = new Event('Model.beforeFind', $table, [$this, $this->_options, !$this->eagerLoaded()]);
-		$table->eventManager()->dispatch($event);
+		$table->dispatchEvent('Model.beforeFind', [$this, $this->_options, !$this->eagerLoaded()]);
 
 		if (isset($this->_results)) {
 			return $this->_results;
@@ -287,13 +284,13 @@ trait QueryTrait {
  *
  * {{{
  * // Return all results from the table indexed by id
- * $query->select(['id', 'name'])->formatResults(function($results, $query) {
+ * $query->select(['id', 'name'])->formatResults(function ($results, $query) {
  *   return $results->indexBy('id');
  * });
  *
  * // Add a new column to the ResultSet
- * $query->select(['name', 'birth_date'])->formatResults(function($results, $query) {
- *   return $results->map(function($row) {
+ * $query->select(['name', 'birth_date'])->formatResults(function ($results, $query) {
+ *   return $results->map(function ($row) {
  *     $row['age'] = $row['birth_date']->diff(new DateTime)->y;
  *     return $row;
  *   });
@@ -396,7 +393,7 @@ trait QueryTrait {
  * Decorates the results iterator with MapReduce routines and formatters
  *
  * @param \Traversable $result Original results
- * @return \Cake\Datasource\ResultSetDecorator
+ * @return \Cake\Datasource\ResultSetInterface
  */
 	protected function _decorateResults($result) {
 		$decorator = $this->_decoratorClass();

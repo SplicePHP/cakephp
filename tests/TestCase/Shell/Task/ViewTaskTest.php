@@ -14,18 +14,17 @@
  */
 namespace Cake\Test\TestCase\Shell\Task;
 
-use Cake\Shell\Task\TemplateTask;
-use Cake\Shell\Task\ViewTask;
 use Cake\Controller\Controller;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
+use Cake\Shell\Task\TemplateTask;
+use Cake\Shell\Task\ViewTask;
 use Cake\TestSuite\TestCase;
 
 /**
  * Test View Task Comment Model
- *
  */
 class ViewTaskCommentsTable extends Table {
 
@@ -40,7 +39,6 @@ class ViewTaskCommentsTable extends Table {
 
 /**
  * Test View Task Article Model
- *
  */
 class ViewTaskArticlesTable extends Table {
 
@@ -52,7 +50,6 @@ class ViewTaskArticlesTable extends Table {
 
 /**
  * Test View Task Comments Controller
- *
  */
 class ViewTaskCommentsController extends Controller {
 
@@ -76,7 +73,6 @@ class ViewTaskCommentsController extends Controller {
 
 }
 
-
 /**
  * ViewTaskTest class
  */
@@ -88,8 +84,12 @@ class ViewTaskTest extends TestCase {
  * @var array
  */
 	public $fixtures = array(
-		'core.article', 'core.post', 'core.comment',
-		'core.articles_tag', 'core.tag', 'core.test_plugin_comment');
+		'core.articles', 'core.posts', 'core.comments',
+		'core.articles_tags',
+		'core.tags',
+		'core.test_plugin_comments',
+		'core.category_threads',
+	);
 
 /**
  * setUp method
@@ -226,7 +226,7 @@ class ViewTaskTest extends TestCase {
 		$this->assertEquals('Articles', $this->Task->modelName);
 
 		$this->Task->model('NotThere');
-		$this->assertEquals('NotTheres', $this->Task->modelName);
+		$this->assertEquals('NotThere', $this->Task->modelName);
 	}
 
 /**
@@ -289,7 +289,7 @@ class ViewTaskTest extends TestCase {
 	public function testGetContent() {
 		$vars = array(
 			'modelClass' => 'TestViewModel',
-			'schema' => [],
+			'schema' => TableRegistry::get('ViewTaskComments')->schema(),
 			'primaryKey' => ['id'],
 			'displayField' => 'name',
 			'singularVar' => 'testViewModel',
@@ -320,7 +320,7 @@ class ViewTaskTest extends TestCase {
 	public function testGetContentWithRoutingPrefix() {
 		$vars = array(
 			'modelClass' => 'TestViewModel',
-			'schema' => [],
+			'schema' => TableRegistry::get('ViewTaskComments')->schema(),
 			'primaryKey' => ['id'],
 			'displayField' => 'name',
 			'singularVar' => 'testViewModel',
@@ -425,6 +425,26 @@ class ViewTaskTest extends TestCase {
 			->with(
 				$this->_normalizePath(APP . 'Template/ViewTaskComments/index.ctp'),
 				$this->stringContains('$viewTaskComment->article->id')
+			);
+
+		$this->Task->bake('index', true);
+	}
+
+/**
+ * Ensure that models associated with themselves do not have action
+ * links generated.
+ *
+ * @return void
+ */
+	public function testBakeSelfAssociations() {
+		$this->Task->controllerName = 'CategoryThreads';
+		$this->Task->modelName = 'TestApp\Model\Table\CategoryThreadsTable';
+
+		$this->Task->expects($this->once())
+			->method('createFile')
+			->with(
+				$this->_normalizePath(APP . 'Template/CategoryThreads/index.ctp'),
+				$this->logicalNot($this->stringContains('ParentCategoryThread'))
 			);
 
 		$this->Task->bake('index', true);
@@ -609,7 +629,7 @@ class ViewTaskTest extends TestCase {
  * @return void
  */
 	public static function nameVariations() {
-		return [['ViewTaskComments'], ['ViewTaskComment'], ['view_task_comment']];
+		return [['ViewTaskComments'], ['view_task_comments']];
 	}
 
 /**

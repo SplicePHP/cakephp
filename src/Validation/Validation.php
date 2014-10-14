@@ -14,10 +14,9 @@
  */
 namespace Cake\Validation;
 
-use Cake\Core\App;
-use Cake\Error\Exception;
-use Cake\Utility\File;
-use Cake\Utility\Number;
+use Cake\Utility\String;
+use LogicException;
+use RuntimeException;
 
 /**
  * Validation Class. Used for validation of model data
@@ -160,11 +159,13 @@ class Validation {
 				'maestro'	=> '/^(?:5020|6\\d{3})\\d{12}$/',
 				'mc'		=> '/^5[1-5]\\d{14}$/',
 				'solo'		=> '/^(6334[5-9][0-9]|6767[0-9]{2})\\d{10}(\\d{2,3})?$/',
-				'switch'	=> '/^(?:49(03(0[2-9]|3[5-9])|11(0[1-2]|7[4-9]|8[1-2])|36[0-9]{2})\\d{10}(\\d{2,3})?)|(?:564182\\d{10}(\\d{2,3})?)|(6(3(33[0-4][0-9])|759[0-9]{2})\\d{10}(\\d{2,3})?)$/',
+				'switch'	=>
+				'/^(?:49(03(0[2-9]|3[5-9])|11(0[1-2]|7[4-9]|8[1-2])|36[0-9]{2})\\d{10}(\\d{2,3})?)|(?:564182\\d{10}(\\d{2,3})?)|(6(3(33[0-4][0-9])|759[0-9]{2})\\d{10}(\\d{2,3})?)$/',
 				'visa'		=> '/^4\\d{12}(\\d{3})?$/',
 				'voyager'	=> '/^8699[0-9]{11}$/'
 			),
-			'fast' => '/^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6011[0-9]{12}|3(?:0[0-5]|[68][0-9])[0-9]{11}|3[47][0-9]{13})$/'
+			'fast' =>
+			'/^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6011[0-9]{12}|3(?:0[0-5]|[68][0-9])[0-9]{11}|3[47][0-9]{13})$/'
 		);
 
 		if (is_array($type)) {
@@ -670,9 +671,7 @@ class Validation {
 				break;
 			}
 		}
-		if (empty($regex)) {
-			return static::_pass('phone', $check, $country);
-		}
+
 		return static::_check($check, $regex);
 	}
 
@@ -711,9 +710,7 @@ class Validation {
 					break;
 			}
 		}
-		if (empty($regex)) {
-			return static::_pass('postal', $check, $country);
-		}
+
 		return static::_check($check, $regex);
 	}
 
@@ -810,30 +807,6 @@ class Validation {
 	}
 
 /**
- * Attempts to pass unhandled Validation locales to a class starting with $classPrefix
- * and ending with Validation. For example $classPrefix = 'nl', the class would be
- * `NlValidation`.
- *
- * @param string $method The method to call on the other class.
- * @param mixed $check The value to check or an array of parameters for the method to be called.
- * @param string $classPrefix The prefix for the class to do the validation.
- * @return mixed Return of Passed method, false on failure
- */
-	protected static function _pass($method, $check, $classPrefix) {
-		$className = App::className($classPrefix, 'Validation', 'Validation');
-		if (!$className) {
-			trigger_error('Could not find class for validation, unable to complete validation.', E_USER_WARNING);
-			return false;
-		}
-		if (!method_exists($className, $method)) {
-			trigger_error(sprintf('Method %s does not exist on %s unable to complete validation.', $method, $className), E_USER_WARNING);
-			return false;
-		}
-		$check = (array)$check;
-		return call_user_func_array(array($className, $method), $check);
-	}
-
-/**
  * Runs a regular expression match.
  *
  * @param string $check Value to check against the $regex expression
@@ -909,19 +882,30 @@ class Validation {
  * @param string|array $check Value to check.
  * @param array|string $mimeTypes Array of mime types or regex pattern to check.
  * @return bool Success
- * @throws \Cake\Error\Exception when mime type can not be determined.
+ * @throws \RuntimeException when mime type can not be determined.
+ * @throws \LogicException when ext/fileinfo is missing
  */
 	public static function mimeType($check, $mimeTypes = array()) {
 		if (is_array($check) && isset($check['tmp_name'])) {
 			$check = $check['tmp_name'];
 		}
 
-		$File = new File($check);
-		$mime = $File->mime();
-
-		if ($mime === false) {
-			throw new Exception('Can not determine the mimetype.');
+		if (!function_exists('finfo_open')) {
+			throw new LogicException('ext/fileinfo is required for validating file mime types');
 		}
+
+		if (!is_file($check)) {
+			throw new RuntimeException('Cannot validate mimetype for a missing file');
+		}
+
+		$finfo = finfo_open(FILEINFO_MIME);
+		$finfo = finfo_file($finfo, $check);
+
+		if (!$finfo) {
+			throw new RuntimeException('Can not determine the mimetype.');
+		}
+
+		list($mime) = explode(';', $finfo);
 
 		if (is_string($mimeTypes)) {
 			return self::_check($mime, $mimeTypes);
@@ -947,7 +931,7 @@ class Validation {
 		}
 
 		if (is_string($size)) {
-			$size = Number::fromReadableSize($size);
+			$size = String::parseFileSize($size);
 		}
 		$filesize = filesize($check);
 
@@ -958,15 +942,71 @@ class Validation {
  * Checking for upload errors
  *
  * @param string|array $check Value to check.
+ * @param bool $allowNoFile Set to true to allow UPLOAD_ERR_NO_FILE as a pass.
  * @return bool
  * @see http://www.php.net/manual/en/features.file-upload.errors.php
  */
-	public static function uploadError($check) {
+	public static function uploadError($check, $allowNoFile = false) {
 		if (is_array($check) && isset($check['error'])) {
 			$check = $check['error'];
 		}
-
+		if ($allowNoFile) {
+			return in_array((int)$check, [UPLOAD_ERR_OK, UPLOAD_ERR_NO_FILE], true);
+		}
 		return (int)$check === UPLOAD_ERR_OK;
+	}
+
+/**
+ * Validate an uploaded file.
+ *
+ * Helps join `uploadError`, `fileSize` and `mimeType` into
+ * one higher level validation method.
+ *
+ * ### Options
+ *
+ * - `types` - A list of valid mime types. If empty all types
+ *   will be accepted. The `type` will not be looked at, instead
+ *   the file type will be checked with ext/finfo.
+ * - `minSize` - The minimum file size. Defaults to not checking.
+ * - `maxSize` - The maximum file size. Defaults to not checking.
+ * - `optional` - Whether or not this file is optional. Defaults to false.
+ *   If true a missing file will pass the validator regardless of other constraints.
+ *
+ * @param array $file The uploaded file data from PHP.
+ * @param array $options An array of options for the validation.
+ * @return bool
+ */
+	public static function uploadedFile($file, $options = []) {
+		$options += [
+			'minSize' => null,
+			'maxSize' => null,
+			'types' => null,
+			'optional' => false,
+		];
+		if (!is_array($file)) {
+			return false;
+		}
+		$keys = ['error', 'name', 'size', 'tmp_name', 'type'];
+		ksort($file);
+		if (array_keys($file) != $keys) {
+			return false;
+		}
+		if (!static::uploadError($file, $options['optional'])) {
+			return false;
+		}
+		if ($options['optional'] && (int)$file['error'] === UPLOAD_ERR_NO_FILE) {
+			return true;
+		}
+		if (isset($options['minSize']) && !static::fileSize($file, '>=', $options['minSize'])) {
+			return false;
+		}
+		if (isset($options['maxSize']) && !static::fileSize($file, '<=', $options['maxSize'])) {
+			return false;
+		}
+		if (isset($options['types']) && !static::mimeType($file, $options['types'])) {
+			return false;
+		}
+		return true;
 	}
 
 /**

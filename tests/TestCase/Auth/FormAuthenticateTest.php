@@ -19,12 +19,12 @@ use Cake\Cache\Cache;
 use Cake\Core\App;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use Cake\I18n\Time;
 use Cake\Network\Request;
 use Cake\ORM\Entity;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
 use Cake\Utility\Security;
-use Cake\Utility\Time;
 
 /**
  * Test case for FormAuthentication
@@ -37,7 +37,7 @@ class FormAuthenticateTest extends TestCase {
  *
  * @var array
  */
-	public $fixtures = ['core.user', 'core.auth_user'];
+	public $fixtures = ['core.users', 'core.auth_users'];
 
 /**
  * setup
@@ -232,7 +232,7 @@ class FormAuthenticateTest extends TestCase {
 		$PluginModel = TableRegistry::get('TestPlugin.AuthUsers');
 		$user['id'] = 1;
 		$user['username'] = 'gwoo';
-		$user['password'] = password_hash(Configure::read('Security.salt') . 'cake', PASSWORD_BCRYPT);
+		$user['password'] = password_hash(Security::salt() . 'cake', PASSWORD_BCRYPT);
 		$PluginModel->save(new Entity($user));
 
 		$this->auth->config('userModel', 'TestPlugin.AuthUsers');

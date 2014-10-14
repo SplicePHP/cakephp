@@ -16,10 +16,20 @@ namespace Cake\Test\TestCase\Model\Behavior;
 
 use Cake\Collection\Collection;
 use Cake\Event\Event;
+use Cake\I18n\I18n;
 use Cake\Model\Behavior\TranslateBehavior;
+use Cake\Model\Behavior\Translate\TranslateTrait;
 use Cake\ORM\Entity;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
+
+/**
+ * Stub entity class
+ */
+class Article extends Entity {
+
+	use TranslateTrait;
+}
 
 /**
  * Translate behavior test case
@@ -32,14 +42,15 @@ class TranslateBehaviorTest extends TestCase {
  * @var array
  */
 	public $fixtures = [
-		'core.translate',
-		'core.article',
-		'core.comment',
-		'core.author'
+		'core.translates',
+		'core.articles',
+		'core.comments',
+		'core.authors'
 	];
 
 	public function tearDown() {
 		parent::tearDown();
+		I18n::locale(I18n::defaultLocale());
 		TableRegistry::clear();
 	}
 
@@ -50,12 +61,12 @@ class TranslateBehaviorTest extends TestCase {
  * @return Collection
  */
 	protected function _extractTranslations($data) {
-		return (new Collection($data))->map(function($row) {
+		return (new Collection($data))->map(function ($row) {
 			$translations = $row->get('_translations');
 			if (!$translations) {
 				return [];
 			}
-			return array_map(function($t) {
+			return array_map(function ($t) {
 				return $t->toArray();
 			}, $translations);
 		});
@@ -75,6 +86,102 @@ class TranslateBehaviorTest extends TestCase {
 			1 => ['Title #1' => 'Content #1'],
 			2 => ['Title #2' => 'Content #2'],
 			3 => ['Title #3' => 'Content #3'],
+		];
+		$this->assertSame($expected, $results);
+	}
+
+/**
+ * Tests that fields from a translated model use the I18n class locale
+ * and that it propogates to associated models
+ *
+ * @return void
+ */
+	public function testFindSingleLocaleAssociatedEnv() {
+		I18n::locale('eng');
+
+		$table = TableRegistry::get('Articles');
+		$table->addBehavior('Translate', ['fields' => ['title', 'body']]);
+
+		$table->hasMany('Comments');
+		$table->Comments->addBehavior('Translate', ['fields' => ['comment']]);
+
+		$results = $table->find()
+			->select(['id', 'title', 'body'])
+			->contain(['Comments' => ['fields' => ['article_id', 'comment']]])
+			->hydrate(false)
+			->toArray();
+
+		$expected = [
+			[
+				'id' => 1,
+				'title' => 'Title #1',
+				'body' => 'Content #1',
+				'comments' => [
+					['article_id' => 1, 'comment' => 'Comment #1', '_locale' => 'eng'],
+					['article_id' => 1, 'comment' => 'Comment #2', '_locale' => 'eng'],
+					['article_id' => 1, 'comment' => 'Comment #3', '_locale' => 'eng'],
+					['article_id' => 1, 'comment' => 'Comment #4', '_locale' => 'eng']
+				],
+				'_locale' => 'eng'
+			],
+			[
+				'id' => 2,
+				'title' => 'Title #2',
+				'body' => 'Content #2',
+				'comments' => [
+					['article_id' => 2, 'comment' => 'First Comment for Second Article', '_locale' => 'eng'],
+					['article_id' => 2, 'comment' => 'Second Comment for Second Article', '_locale' => 'eng']
+				],
+				'_locale' => 'eng'
+			],
+			[
+				'id' => 3,
+				'title' => 'Title #3',
+				'body' => 'Content #3',
+				'comments' => [],
+				'_locale' => 'eng'
+			]
+		];
+		$this->assertSame($expected, $results);
+
+		I18n::locale('spa');
+
+		$results = $table->find()
+			->select(['id', 'title', 'body'])
+			->contain(['Comments' => ['fields' => ['article_id', 'comment']]])
+			->hydrate(false)
+			->toArray();
+
+		$expected = [
+			[
+				'id' => 1,
+				'title' => 'First Article',
+				'body' => 'First Article Body',
+				'comments' => [
+					['article_id' => 1, 'comment' => 'First Comment for First Article', '_locale' => 'spa'],
+					['article_id' => 1, 'comment' => 'Second Comment for First Article', '_locale' => 'spa'],
+					['article_id' => 1, 'comment' => 'Third Comment for First Article', '_locale' => 'spa'],
+					['article_id' => 1, 'comment' => 'Comentario #4', '_locale' => 'spa']
+				],
+				'_locale' => 'spa'
+			],
+			[
+				'id' => 2,
+				'title' => 'Second Article',
+				'body' => 'Second Article Body',
+				'comments' => [
+					['article_id' => 2, 'comment' => 'First Comment for Second Article', '_locale' => 'spa'],
+					['article_id' => 2, 'comment' => 'Second Comment for Second Article', '_locale' => 'spa']
+				],
+				'_locale' => 'spa'
+			],
+			[
+				'id' => 3,
+				'title' => 'Third Article',
+				'body' => 'Third Article Body',
+				'comments' => [],
+				'_locale' => 'spa'
+			]
 		];
 		$this->assertSame($expected, $results);
 	}
@@ -305,7 +412,7 @@ class TranslateBehaviorTest extends TestCase {
 		$table->locale('eng');
 		$comments->locale('eng');
 
-		$results = $table->find()->contain(['Comments' => function($q) {
+		$results = $table->find()->contain(['Comments' => function ($q) {
 			return $q->select(['id', 'comment', 'article_id']);
 		}]);
 
@@ -332,7 +439,7 @@ class TranslateBehaviorTest extends TestCase {
 		$comments->addBehavior('Translate', ['fields' => ['comment']]);
 
 		$results = $table->find('translations')->contain([
-			'Comments' => function($q) {
+			'Comments' => function ($q) {
 				return $q->find('translations')->select(['id', 'comment', 'article_id']);
 			}
 		]);
@@ -374,7 +481,7 @@ class TranslateBehaviorTest extends TestCase {
 		$table->locale('cze');
 		$comments->locale('eng');
 		$results = $table->find('translations')->contain([
-			'Comments' => function($q) {
+			'Comments' => function ($q) {
 				return $q->find('translations')->select(['id', 'comment', 'article_id']);
 			}
 		]);
@@ -428,7 +535,7 @@ class TranslateBehaviorTest extends TestCase {
 		$results = $table->find()
 			->select(['title', 'body'])
 			->order(['title' => 'asc'])
-			->contain(['Authors' => function($q) {
+			->contain(['Authors' => function ($q) {
 				return $q->select(['id', 'name']);
 			}]);
 
@@ -452,7 +559,7 @@ class TranslateBehaviorTest extends TestCase {
 				'_locale' => 'eng'
 			]
 		];
-		$results = array_map(function($r) {
+		$results = array_map(function ($r) {
 			return $r->toArray();
 		}, $results->toArray());
 		$this->assertEquals($expected, $results);
@@ -642,6 +749,49 @@ class TranslateBehaviorTest extends TestCase {
 		$this->assertEquals('Another body', $translations['eng']->get('body'));
 		$this->assertEquals('Titulo', $translations['spa']->get('title'));
 		$this->assertEquals('Titre', $translations['fre']->get('title'));
+	}
+
+/**
+ * Tests that iterating a resultset twice when using the translations finder
+ * will not cause any errors nor information loss
+ *
+ * @return void
+ */
+	public function testUseCountInFindTranslations() {
+		$table = TableRegistry::get('Articles');
+		$table->addBehavior('Translate', ['fields' => ['title', 'body']]);
+		$articles = $results = $table->find('translations');
+		$all = $articles->all();
+		$this->assertCount(3, $all);
+		$article = $all->first();
+		$this->assertNotEmpty($article->get('_translations'));
+	}
+
+/**
+ * Tests that multiple translations saved when having a default locale
+ * are correclty saved
+ *
+ * @return void
+ */
+	public function testSavingWithNonDefaultLocale() {
+		$table = TableRegistry::get('Articles');
+		$table->addBehavior('Translate', ['fields' => ['title', 'body']]);
+		$table->entityClass(__NAMESPACE__ . '\Article');
+		I18n::locale('fra');
+		$translations = [
+			'fra' => ['title' => 'Un article'],
+			'spa' => ['title' => 'Un artículo']
+		];
+
+		$article = $table->get(1);
+		foreach ($translations as $lang => $data) {
+			$article->translation($lang)->set($data, ['guard' => false]);
+		}
+
+		$table->save($article);
+		$article = $table->find('translations')->where(['Articles.id' => 1])->first();
+		$this->assertEquals('Un article', $article->translation('fra')->title);
+		$this->assertEquals('Un artículo', $article->translation('spa')->title);
 	}
 
 }

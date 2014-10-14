@@ -177,7 +177,7 @@ class MemcachedEngineTest extends TestCase {
 		);
 
 		$this->setExpectedException(
-			'Cake\Error\Exception', 'invalid_serializer is not a valid serializer engine for Memcached'
+			'InvalidArgumentException', 'invalid_serializer is not a valid serializer engine for Memcached'
 		);
 		$Memcached->init($config);
 	}
@@ -289,7 +289,7 @@ class MemcachedEngineTest extends TestCase {
 		);
 
 		$this->setExpectedException(
-			'Cake\Error\Exception', 'Memcached extension is not compiled with json support'
+			'InvalidArgumentException', 'Memcached extension is not compiled with json support'
 		);
 		$Memcached->init($config);
 	}
@@ -314,7 +314,7 @@ class MemcachedEngineTest extends TestCase {
 		);
 
 		$this->setExpectedException(
-			'Cake\Error\Exception', 'msgpack is not a valid serializer engine for Memcached'
+			'InvalidArgumentException', 'msgpack is not a valid serializer engine for Memcached'
 		);
 		$Memcached->init($config);
 	}
@@ -339,7 +339,7 @@ class MemcachedEngineTest extends TestCase {
 		);
 
 		$this->setExpectedException(
-			'Cake\Error\Exception', 'Memcached extension is not compiled with igbinary support'
+			'InvalidArgumentException', 'Memcached extension is not compiled with igbinary support'
 		);
 		$Memcached->init($config);
 	}
@@ -351,7 +351,7 @@ class MemcachedEngineTest extends TestCase {
  * @return void
  */
 	public function testSaslAuthException() {
-		$Memcached = new TestMemcachedEngine();
+		$MemcachedEngine = new TestMemcachedEngine();
 		$config = array(
 			'engine' => 'Memcached',
 			'servers' => array('127.0.0.1:11211'),
@@ -360,15 +360,16 @@ class MemcachedEngineTest extends TestCase {
 			'password' => 'password'
 		);
 
+		$Memcached = new Memcached();
 		$this->skipIf(
-			method_exists($Memcached->getMemcached(), 'setSaslAuthData'),
+			method_exists($Memcached, 'setSaslAuthData'),
 			'Memcached extension is installed with SASL support'
 		);
 
 		$this->setExpectedException(
-			'Cake\Error\Exception', 'Memcached extension is not build with SASL support'
+			'InvalidArgumentException', 'Memcached extension is not build with SASL support'
 		);
-		$Memcached->init($config);
+		$MemcachedEngine->init($config);
 	}
 
 /**

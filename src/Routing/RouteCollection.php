@@ -14,12 +14,8 @@
  */
 namespace Cake\Routing;
 
-use Cake\Core\App;
-use Cake\Error;
-use Cake\Routing\Error\MissingRouteException;
-use Cake\Routing\Router;
+use Cake\Routing\Exception\MissingRouteException;
 use Cake\Routing\Route\Route;
-use Cake\Utility\Inflector;
 
 /**
  * Contains a collection of routes.
@@ -70,11 +66,11 @@ class RouteCollection {
  * Add a route to the collection.
  *
  * @param \Cake\Routing\Route\Route $route The route object to add.
- * @param array $options Addtional options for the route. Primarily for the
+ * @param array $options Additional options for the route. Primarily for the
  *   `_name` option, which enables named routes.
  * @return void
  */
-	public function add(Route $route, $options = []) {
+	public function add(Route $route, array $options = []) {
 		$this->_routes[] = $route;
 
 		// Explicit names
@@ -99,7 +95,7 @@ class RouteCollection {
 
 		$extensions = $route->extensions();
 		if ($extensions) {
-			$this->addExtensions($extensions);
+			$this->extensions($extensions);
 		}
 	}
 
@@ -108,7 +104,7 @@ class RouteCollection {
  *
  * @param string $url URL to parse.
  * @return array An array of request parameters parsed from the URL.
- * @throws \Cake\Routing\Error\MissingRouteException When a URL has no matching route.
+ * @throws \Cake\Routing\Exception\MissingRouteException When a URL has no matching route.
  */
 	public function parse($url) {
 		foreach (array_keys($this->_paths) as $path) {
@@ -224,7 +220,7 @@ class RouteCollection {
  * @param array $context The request context to use. Contains _base, _port,
  *    _host, and _scheme keys.
  * @return string|false Either a string on match, or false on failure.
- * @throws \Cake\Routing\Error\MissingRouteException when a route cannot be matched.
+ * @throws \Cake\Routing\Exception\MissingRouteException when a route cannot be matched.
  */
 	public function match($url, $context) {
 		// Named routes support optimization.
@@ -275,26 +271,28 @@ class RouteCollection {
 	}
 
 /**
- * Add one or more extensions.
- *
- * @param array $extensions The extensions to add.
- * @return void
- */
-	public function addExtensions(array $extensions) {
-		$this->_extensions = array_unique(array_merge($this->_extensions, $extensions));
-	}
-
-/**
  * Get/set the extensions that the route collection could handle.
  *
- * @param null|string|array $extensions Either the list of extensions to set, or null to get.
+ * @param null|string|array $extensions Either the list of extensions to set,
+ *   or null to get.
+ * @param bool $merge Whether to merge with or override existing extensions.
+ *   Defaults to `true`.
  * @return array The valid extensions.
  */
-	public function extensions($extensions = null) {
+	public function extensions($extensions = null, $merge = true) {
 		if ($extensions === null) {
-			return array_unique($this->_extensions);
+			return $this->_extensions;
 		}
-		$this->_extensions = (array)$extensions;
+
+		$extensions = (array)$extensions;
+		if ($merge) {
+			$extensions = array_unique(array_merge(
+				$this->_extensions,
+				$extensions
+			));
+		}
+
+		return $this->_extensions = $extensions;
 	}
 
 }

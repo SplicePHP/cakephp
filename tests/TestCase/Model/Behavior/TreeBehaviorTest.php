@@ -32,8 +32,8 @@ class TreeBehaviorTest extends TestCase {
  * @var array
  */
 	public $fixtures = [
-		'core.number_tree',
-		'core.menu_link_tree'
+		'core.number_trees',
+		'core.menu_link_trees'
 	];
 
 	public function setUp() {
@@ -164,7 +164,7 @@ class TreeBehaviorTest extends TestCase {
 /**
  * Tests that find('children') will throw an exception if the node was not found
  *
- * @expectedException \Cake\ORM\Error\RecordNotFoundException
+ * @expectedException \Cake\ORM\Exception\RecordNotFoundException
  * @return void
  */
 	public function testFindChildrenException() {
@@ -193,6 +193,46 @@ class TreeBehaviorTest extends TestCase {
 			8 => 'Link 8'
 		];
 		$this->assertEquals($expected, $result);
+	}
+
+/**
+ * Tests the find('treeList') method after moveUp, moveDown 
+ *
+ * @return void
+ */
+	public function testFindTreeListAfterMove() {
+		$table = TableRegistry::get('MenuLinkTrees');
+		$table->addBehavior('Tree', ['scope' => ['menu' => 'main-menu']]);
+
+		// moveUp
+		$table->moveUp($table->get(3), 1);
+		$result = $table->find('treeList')->toArray();
+		$expected = [
+			1 => 'Link 1',
+			3 => '_Link 3',
+			4 => '__Link 4',
+			5 => '___Link 5',
+			2 => '_Link 2',
+			6 => 'Link 6',
+			7 => '_Link 7',
+			8 => 'Link 8'
+		];
+		$this->assertSame($expected, $result);
+
+		// moveDown
+		$table->moveDown($table->get(6), 1);
+		$result2 = $table->find('treeList')->toArray();
+		$expected2 = [
+			1 => 'Link 1',
+			3 => '_Link 3',
+			4 => '__Link 4',
+			5 => '___Link 5',
+			2 => '_Link 2',
+			8 => 'Link 8',
+			6 => 'Link 6',
+			7 => '_Link 7',
+		];
+		$this->assertSame($expected2, $result2);
 	}
 
 /**
@@ -268,7 +308,7 @@ class TreeBehaviorTest extends TestCase {
 		$this->assertEquals(['lft' => 1, 'rght' => 2], $node->extract(['lft', 'rght']));
 		$nodes = $table->find()
 			->select(['id'])
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->isNull('parent_id');
 			})
 			->where(['menu' => 'main-menu'])
@@ -292,7 +332,7 @@ class TreeBehaviorTest extends TestCase {
 		$this->assertEquals(['lft' => 1, 'rght' => 2], $node->extract(['lft', 'rght']));
 		$nodes = $table->find()
 			->select(['id'])
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->isNull('parent_id');
 			})
 			->where(['menu' => 'main-menu'])
@@ -347,7 +387,7 @@ class TreeBehaviorTest extends TestCase {
 		$this->assertEquals(['lft' => 7, 'rght' => 16], $node->extract(['lft', 'rght']));
 		$nodes = $table->find()
 			->select(['id'])
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->isNull('parent_id');
 			})
 			->where(['menu' => 'main-menu'])
@@ -371,7 +411,7 @@ class TreeBehaviorTest extends TestCase {
 		$this->assertEquals(['lft' => 7, 'rght' => 16], $node->extract(['lft', 'rght']));
 		$nodes = $table->find()
 			->select(['id'])
-			->where(function($exp) {
+			->where(function ($exp) {
 				return $exp->isNull('parent_id');
 			})
 			->where(['menu' => 'main-menu'])
@@ -756,6 +796,27 @@ class TreeBehaviorTest extends TestCase {
 	}
 
 /**
+ * Tests that using associations having tree fields in the schema
+ * does not generate SQL errors
+ *
+ * @return void
+ */
+	public function testFindPathWithAssociation() {
+		$table = $this->table;
+		$other = TableRegistry::get('FriendlyTrees', [
+			'table' => $table->table()
+		]);
+		$table->hasOne('FriendlyTrees', [
+			'foreignKey' => 'id'
+		]);
+		$result = $table
+			->find('children', ['for' => 1])
+			->contain('FriendlyTrees')
+			->toArray();
+		$this->assertCount(9, $result);
+	}
+
+/**
  * Custom assertion use to verify tha a tree is returned in the expected order
  * and that it is still valid
  *
@@ -767,7 +828,7 @@ class TreeBehaviorTest extends TestCase {
 		$result = $table->find()->order('lft')->hydrate(false);
 		$this->assertEquals($expected, $result->extract('id')->toArray());
 		$numbers = [];
-		$result->each(function($v) use (&$numbers) {
+		$result->each(function ($v) use (&$numbers) {
 			$numbers[] = $v['lft'];
 			$numbers[] = $v['rght'];
 		});

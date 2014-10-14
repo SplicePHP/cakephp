@@ -16,7 +16,7 @@ namespace Cake\Controller\Component;
 
 use Cake\Controller\Component;
 use Cake\Controller\ComponentRegistry;
-use Cake\Error\InternalErrorException;
+use Cake\Network\Exception\InternalErrorException;
 use Cake\Utility\Inflector;
 
 /**
@@ -47,12 +47,12 @@ class FlashComponent extends Component {
 /**
  * Constructor
  *
- * @param ComponentRegistry $collection A ComponentRegistry for this component
+ * @param ComponentRegistry $registry A ComponentRegistry for this component
  * @param array $config Array of config.
  */
-	public function __construct(ComponentRegistry $collection, array $config = []) {
-		parent::__construct($collection, $config);
-		$this->_session = $collection->getController()->request->session();
+	public function __construct(ComponentRegistry $registry, array $config = []) {
+		parent::__construct($registry, $config);
+		$this->_session = $registry->getController()->request->session();
 	}
 
 /**
@@ -73,26 +73,26 @@ class FlashComponent extends Component {
  * @return void
  */
 	public function set($message, array $options = []) {
-		$opts = array_merge($this->config(), $options);
+		$options += $this->config();
 
 		if ($message instanceof \Exception) {
-			$opts['params'] += ['code' => $message->getCode()];
+			$options['params'] += ['code' => $message->getCode()];
 			$message = $message->getMessage();
 		}
 
-		list($plugin, $element) = pluginSplit($opts['element']);
+		list($plugin, $element) = pluginSplit($options['element']);
 
 		if ($plugin) {
-			$opts['element'] = $plugin . '.Flash/' . $element;
+			$options['element'] = $plugin . '.Flash/' . $element;
 		} else {
-			$opts['element'] = 'Flash/' . $element;
+			$options['element'] = 'Flash/' . $element;
 		}
 
-		$this->_session->write('Flash.' . $opts['key'], [
+		$this->_session->write('Flash.' . $options['key'], [
 			'message' => $message,
-			'key' => $opts['key'],
-			'element' => $opts['element'],
-			'params' => $opts['params']
+			'key' => $options['key'],
+			'element' => $options['element'],
+			'params' => $options['params']
 		]);
 	}
 
@@ -106,7 +106,7 @@ class FlashComponent extends Component {
  * @param string $name Element name to use.
  * @param array $args Parameters to pass when calling `FlashComponent::set()`.
  * @return void
- * @throws \Cake\Error\InternalErrorException If missing the flash message.
+ * @throws \Cake\Network\Exception\InternalErrorException If missing the flash message.
  */
 	public function __call($name, $args) {
 		$options = ['element' => Inflector::underscore($name)];

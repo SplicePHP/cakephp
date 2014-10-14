@@ -16,12 +16,11 @@ namespace Cake\Controller\Component;
 
 use Cake\Controller\Component;
 use Cake\Controller\ComponentRegistry;
-use Cake\Core\Configure;
+use Cake\I18n\Time;
 use Cake\Network\Request;
 use Cake\Network\Response;
 use Cake\Utility\Hash;
 use Cake\Utility\Security;
-use Cake\Utility\Time;
 
 /**
  * Cookie Component.
@@ -121,19 +120,17 @@ class CookieComponent extends Component {
 	protected $_validCiphers = ['aes', 'rijndael'];
 
 /**
- * Constructor
+ * Initialize config data and properties.
  *
- * @param ComponentRegistry $collection A ComponentRegistry for this component
- * @param array $config Array of config.
+ * @param array $config The config data.
+ * @return void
  */
-	public function __construct(ComponentRegistry $collection, array $config = array()) {
-		parent::__construct($collection, $config);
-
+	public function initialize(array $config) {
 		if (!$this->_config['key']) {
-			$this->config('key', Configure::read('Security.salt'));
+			$this->config('key', Security::salt());
 		}
 
-		$controller = $collection->getController();
+		$controller = $this->_registry->getController();
 		if ($controller && isset($controller->request)) {
 			$this->_request = $controller->request;
 		} else {

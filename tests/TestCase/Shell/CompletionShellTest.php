@@ -14,12 +14,12 @@
  */
 namespace Cake\Test\TestCase\Shell;
 
-use Cake\Shell\CompletionShell;
-use Cake\Shell\Task\CommandTask;
 use Cake\Console\ConsoleIo;
 use Cake\Console\ConsoleOutput;
 use Cake\Console\Shell;
 use Cake\Core\Plugin;
+use Cake\Shell\CompletionShell;
+use Cake\Shell\Task\CommandTask;
 use Cake\TestSuite\TestCase;
 
 /**
@@ -112,7 +112,8 @@ class CompletionShellTest extends TestCase {
 		$this->Shell->runCommand(['commands']);
 		$output = $this->out->output;
 
-		$expected = "TestPlugin.example TestPluginTwo.example TestPluginTwo.welcome bake i18n orm_cache server test sample\n";
+		$expected = "TestPlugin.example TestPlugin.sample " .
+			"TestPluginTwo.example TestPluginTwo.welcome bake i18n orm_cache server test sample\n";
 		$this->assertTextEquals($expected, $output);
 	}
 

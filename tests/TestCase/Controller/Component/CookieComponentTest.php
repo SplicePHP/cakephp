@@ -18,11 +18,11 @@ use Cake\Controller\ComponentRegistry;
 use Cake\Controller\Component\CookieComponent;
 use Cake\Controller\Controller;
 use Cake\Event\Event;
+use Cake\I18n\Time;
 use Cake\Network\Request;
 use Cake\Network\Response;
 use Cake\TestSuite\TestCase;
 use Cake\Utility\Security;
-use Cake\Utility\Time;
 
 /**
  * CookieComponentTest class
@@ -41,8 +41,7 @@ class CookieComponentTest extends TestCase {
 			array('redirect'),
 			array(new Request(), new Response())
 		);
-		$controller->components = array('Cookie');
-		$controller->constructClasses();
+		$controller->loadComponent('Cookie');
 		$this->Controller = $controller;
 		$this->Cookie = $controller->Cookie;
 		$this->request = $controller->request;

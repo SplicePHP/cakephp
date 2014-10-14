@@ -118,7 +118,7 @@ class FormHelperTest extends TestCase {
  *
  * @var array
  */
-	public $fixtures = array('core.article', 'core.comment');
+	public $fixtures = array('core.articles', 'core.comments');
 
 /**
  * Do not load the fixtures by default
@@ -174,7 +174,7 @@ class FormHelperTest extends TestCase {
 			]
 		];
 
-		Configure::write('Security.salt', 'foo!');
+		Security::salt('foo!');
 		Router::connect('/:controller', array('action' => 'index'));
 		Router::connect('/:controller/:action/*');
 	}
@@ -272,6 +272,9 @@ class FormHelperTest extends TestCase {
 	public function contextSelectionProvider() {
 		$entity = new Article();
 		$collection = $this->getMock('Cake\Collection\Collection', ['extract'], [[$entity]]);
+		$emptyCollection = new Collection([]);
+		$emptyArray = [];
+		$arrayObject = new \ArrayObject([]);
 		$data = [
 			'schema' => [
 				'title' => ['type' => 'string']
@@ -281,7 +284,9 @@ class FormHelperTest extends TestCase {
 		return [
 			'entity' => [$entity, 'Cake\View\Form\EntityContext'],
 			'collection' => [$collection, 'Cake\View\Form\EntityContext'],
+			'empty_collection' => [$emptyCollection, 'Cake\View\Form\NullContext'],
 			'array' => [$data, 'Cake\View\Form\ArrayContext'],
+			'array_object' => [$arrayObject, 'Cake\View\Form\NullContext'],
 			'none' => [null, 'Cake\View\Form\NullContext'],
 			'false' => [false, 'Cake\View\Form\NullContext'],
 		];
@@ -294,7 +299,7 @@ class FormHelperTest extends TestCase {
  * @return void
  */
 	public function testCreateContextSelectionBuiltIn($data, $class) {
-		$this->loadFixtures('Article');
+		$this->loadFixtures('Articles');
 		$this->Form->create($data);
 		$this->assertInstanceOf($class, $this->Form->context());
 	}
@@ -511,11 +516,11 @@ class FormHelperTest extends TestCase {
 		);
 		$this->assertHtml($expected, $result);
 
-		$this->Form->request['controller'] = 'pages';
+		$this->Form->request['controller'] = 'Pages';
 		$result = $this->Form->create($this->article, array('action' => 'signup'));
 		$expected = array(
 			'form' => array(
-				'method' => 'post', 'action' => '/pages/signup/1',
+				'method' => 'post', 'action' => '/Pages/signup/1',
 				'accept-charset' => $encoding
 			),
 			'div' => array('style' => 'display:none;'),
@@ -541,6 +546,23 @@ class FormHelperTest extends TestCase {
 			'form' => array(
 				'method' => 'post', 'action' => '/login',
 				'accept-charset' => $encoding
+			),
+			'div' => array('style' => 'display:none;'),
+			'input' => array('type' => 'hidden', 'name' => '_method', 'value' => 'POST'),
+			'/div'
+		);
+		$this->assertHtml($expected, $result);
+
+		Router::connect(
+			'/new-article',
+			['controller' => 'articles', 'action' => 'myaction'],
+			['_name' => 'my-route']
+		);
+		$result = $this->Form->create(false, ['url' => ['_name' => 'my-route']]);
+		$expected = array(
+			'form' => array(
+				'method' => 'post', 'action' => '/new-article',
+				'accept-charset' => $encoding,
 			),
 			'div' => array('style' => 'display:none;'),
 			'input' => array('type' => 'hidden', 'name' => '_method', 'value' => 'POST'),
@@ -820,7 +842,7 @@ class FormHelperTest extends TestCase {
 		$this->Form->request->params['_Token'] = 'testKey';
 		$result = $this->Form->secure($fields);
 
-		$hash = Security::hash(serialize($fields) . Configure::read('Security.salt'));
+		$hash = Security::hash(serialize($fields) . Security::salt());
 		$hash .= ':' . 'Model.valid';
 		$hash = urlencode($hash);
 
@@ -3666,7 +3688,7 @@ class FormHelperTest extends TestCase {
  * @return void
  */
 	public function testHabtmSelectBox() {
-		$this->loadFixtures('Article');
+		$this->loadFixtures('Articles');
 		$options = array(
 			1 => 'blue',
 			2 => 'red',
@@ -5233,6 +5255,42 @@ class FormHelperTest extends TestCase {
 	}
 
 /**
+ * Test textareas waxlength read from schema.
+ *
+ * @return void
+ */
+	public function testTextAreaMaxLength() {
+		$this->Form->create([
+			'schema' => [
+				'stuff' => ['type' => 'string', 'length' => 10],
+			]
+		]);
+		$result = $this->Form->input('other', array('type' => 'textarea'));
+		$expected = array(
+			'div' => array('class' => 'input textarea'),
+				'label' => array('for' => 'other'),
+					'Other',
+				'/label',
+				'textarea' => array('name' => 'other', 'id' => 'other'),
+				'/textarea',
+			'/div'
+		);
+		$this->assertTags($result, $expected);
+
+		$result = $this->Form->input('stuff', array('type' => 'textarea'));
+		$expected = array(
+			'div' => array('class' => 'input textarea'),
+				'label' => array('for' => 'stuff'),
+					'Stuff',
+				'/label',
+				'textarea' => array('name' => 'stuff', 'maxlength' => 10, 'id' => 'stuff'),
+				'/textarea',
+			'/div'
+		);
+		$this->assertTags($result, $expected);
+	}
+
+/**
  * testHiddenField method
  *
  * @return void
@@ -5522,7 +5580,7 @@ class FormHelperTest extends TestCase {
 			'/posts/delete/1' .
 			serialize(array()) .
 			'' .
-			Configure::read('Security.salt')
+			Security::salt()
 		);
 		$hash .= '%3A';
 		$this->Form->request->params['_Token']['key'] = 'test';
@@ -5956,7 +6014,7 @@ class FormHelperTest extends TestCase {
  * @return void
  */
 	public function testMultiRecordForm() {
-		$this->loadFixtures('Article', 'Comment');
+		$this->loadFixtures('Articles', 'Comments');
 		$articles = TableRegistry::get('Articles');
 		$articles->hasMany('Comments');
 
@@ -5971,7 +6029,6 @@ class FormHelperTest extends TestCase {
 				'/label',
 				'textarea' => array(
 					'name',
-					'type',
 					'id' => '0-comments-1-comment',
 				),
 				'/textarea',
@@ -5987,7 +6044,6 @@ class FormHelperTest extends TestCase {
 				'/label',
 				'textarea' => array(
 					'name',
-					'type',
 					'id' => '0-comments-0-comment'
 				),
 				'Value',
@@ -6005,7 +6061,6 @@ class FormHelperTest extends TestCase {
 				'/label',
 				'textarea' => array(
 					'name',
-					'type',
 					'class' => 'form-error',
 					'id' => '0-comments-0-comment'
 				),
@@ -6029,7 +6084,6 @@ class FormHelperTest extends TestCase {
 				'/label',
 				'textarea' => array(
 					'name',
-					'type',
 					'required' => 'required',
 					'id' => '0-comments-1-comment'
 				),
@@ -6092,7 +6146,7 @@ class FormHelperTest extends TestCase {
 /**
  * Test errors when field name is missing.
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException \Cake\Core\Exception\Exception
  * @return void
  */
 	public function testHtml5InputException() {

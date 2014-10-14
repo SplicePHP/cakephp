@@ -15,9 +15,9 @@
 namespace Cake\Error;
 
 use Cake\Core\Configure;
+use Cake\Error\Debugger;
 use Cake\Log\Log;
 use Cake\Routing\Router;
-use Cake\Utility\Debugger;
 
 /**
  * Base error handler that provides logic common to the CLI + web
@@ -184,15 +184,7 @@ abstract class BaseErrorHandler {
 		];
 		$this->_logError(LOG_ERR, $data);
 
-		if (ob_get_level()) {
-			ob_end_clean();
-		}
-
-		if (Configure::read('debug')) {
-			$this->handleException(new FatalErrorException($description, 500, $file, $line));
-		} else {
-			$this->handleException(new InternalErrorException());
-		}
+		$this->handleException(new FatalErrorException($description, 500, $file, $line));
 		return true;
 	}
 

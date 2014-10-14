@@ -19,9 +19,9 @@ use Cake\Console\Shell;
 use Cake\Core\App;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use Cake\Filesystem\Folder;
 use Cake\Log\Log;
 use Cake\TestSuite\TestCase;
-use Cake\Utility\Folder;
 use Cake\Utility\Hash;
 
 /**
@@ -121,10 +121,15 @@ class ShellTest extends TestCase {
  *
  * @var array
  */
-	public $fixtures = array(
-		'core.post', 'core.comment', 'core.article', 'core.user',
-		'core.tag', 'core.articles_tag', 'core.attachment'
-	);
+	public $fixtures = [
+		'core.posts',
+		'core.comments',
+		'core.articles',
+		'core.users',
+		'core.tags',
+		'core.articles_tags',
+		'core.attachments'
+	];
 
 /**
  * setUp method
@@ -191,8 +196,11 @@ class ShellTest extends TestCase {
 		$this->assertEquals('Articles', $Shell->modelClass);
 
 		Plugin::load('TestPlugin');
-		$this->Shell->loadModel('TestPlugin.TestPluginComments');
-		$this->assertTrue(isset($this->Shell->TestPluginComments));
+		$result = $this->Shell->loadModel('TestPlugin.TestPluginComments');
+		$this->assertInstanceOf(
+			'TestPlugin\Model\Table\TestPluginCommentsTable',
+			$result
+		);
 		$this->assertInstanceOf(
 			'TestPlugin\Model\Table\TestPluginCommentsTable',
 			$this->Shell->TestPluginComments

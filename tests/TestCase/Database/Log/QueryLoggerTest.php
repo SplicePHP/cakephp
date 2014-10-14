@@ -53,7 +53,7 @@ class QueryLoggerTest extends \Cake\TestSuite\TestCase {
 		$logger = $this->getMock('\Cake\Database\Log\QueryLogger', ['_log']);
 		$query = new LoggedQuery;
 		$query->query = 'SELECT a FROM b where a = :p1 AND b = :p2 AND c = :p3';
-		$query->params = ['p1' => 'string', 'p2' => 3, 'p3' => null];
+		$query->params = ['p1' => 'string', 'p3' => null, 'p2' => 3];
 
 		$logger->expects($this->once())->method('_log')->with($query);
 		$logger->log($query);
@@ -90,13 +90,13 @@ class QueryLoggerTest extends \Cake\TestSuite\TestCase {
 		$query->query = 'SELECT a FROM b where a = ? AND b = ? AND c = ?';
 		$query->params = ['string', '3', null];
 
-		$engine = $this->getMock('\Cake\Log\Engine\BaseLog', ['write'], ['scopes' => ['queriesLog']]);
+		$engine = $this->getMock('\Cake\Log\Engine\BaseLog', ['log'], ['scopes' => ['queriesLog']]);
 		Log::engine('queryLoggerTest', $engine);
 
-		$engine2 = $this->getMock('\Cake\Log\Engine\BaseLog', ['write'], ['scopes' => ['foo']]);
+		$engine2 = $this->getMock('\Cake\Log\Engine\BaseLog', ['log'], ['scopes' => ['foo']]);
 		Log::engine('queryLoggerTest2', $engine2);
 
-		$engine2->expects($this->never())->method('write');
+		$engine2->expects($this->never())->method('log');
 		$logger->log($query);
 	}
 

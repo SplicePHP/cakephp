@@ -44,10 +44,10 @@ class CompositeKeyTest extends TestCase {
  * @var array
  */
 	public $fixtures = [
-		'core.site_article',
-		'core.site_author',
-		'core.site_tag',
-		'core.site_articles_tag'
+		'core.site_articles',
+		'core.site_authors',
+		'core.site_tags',
+		'core.site_articles_tags'
 	];
 
 /**
@@ -136,7 +136,7 @@ class CompositeKeyTest extends TestCase {
 
 		$results = $query->repository($table)
 			->select()
-			->contain(['SiteArticles' => ['conditions' => ['id' => 2]]])
+			->contain(['SiteArticles' => ['conditions' => ['SiteArticles.id' => 2]]])
 			->hydrate(false)
 			->toArray();
 		$expected[0]['articles'] = [];

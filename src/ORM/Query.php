@@ -34,6 +34,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
 	use QueryTrait {
 		cache as private _cache;
 		all as private _all;
+		_decorateResults as private _applyDecorators;
 		__call as private _call;
 	}
 
@@ -67,6 +68,14 @@ class Query extends DatabaseQuery implements JsonSerializable {
 	protected $_hasFields;
 
 /**
+ * Tracks whether or not the original query should include
+ * fields from the top level table.
+ *
+ * @var bool
+ */
+	protected $_autoFields;
+
+/**
  * Boolean for tracking whether or not buffered results
  * are enabled.
  *
@@ -98,7 +107,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
 	protected $_eagerLoader;
 
 /**
- * Constuctor
+ * Constructor
  *
  * @param \Cake\Database\Connection $connection The connection object
  * @param \Cake\ORM\Table $table The table this query is starting on
@@ -193,11 +202,11 @@ class Query extends DatabaseQuery implements JsonSerializable {
  * ### Example:
  *
  * {{{
- *	$query->contain(['Tags' => function($q) {
+ *	$query->contain(['Tags' => function ($q) {
  *		return $q->where(['Tags.is_popular' => true]);
  *	}]);
  *
- *	$query->contain(['Products.Manufactures' => function($q) {
+ *	$query->contain(['Products.Manufactures' => function ($q) {
  *		return $q->select(['name'])->where(['Manufactures.active' => true]);
  *	}]);
  * }}}
@@ -224,7 +233,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
  *	$query->contain([
  *		'Likes' => [
  *			'foreignKey' => false,
- *			'queryBuilder' => function($q) {
+ *			'queryBuilder' => function ($q) {
  *				return $q->where(...); // Add full filtering conditions
  *			}
  *		]
@@ -269,7 +278,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
  *
  * {{{
  *  // Bring only articles that were tagged with 'cake'
- *	$query->matching('Tags', function($q) {
+ *	$query->matching('Tags', function ($q) {
  *		return $q->where(['name' => 'cake']);
  *	);
  * }}}
@@ -280,7 +289,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
  *
  * {{{
  *  // Bring only articles that were commented by 'markstory'
- *	$query->matching('Comments.Users', function($q) {
+ *	$query->matching('Comments.Users', function ($q) {
  *		return $q->where(['username' => 'markstory']);
  *	);
  * }}}
@@ -295,7 +304,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
  * {{{
  *  // Bring unique articles that were commented by 'markstory'
  *	$query->distinct(['Articles.id'])
- *	->matching('Comments.Users', function($q) {
+ *	->matching('Comments.Users', function ($q) {
  *		return $q->where(['username' => 'markstory']);
  *	);
  * }}}
@@ -374,7 +383,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
 	}
 
 /**
- * Runs `aliasfield()` for each field in the provided list and returns
+ * Runs `aliasField()` for each field in the provided list and returns
  * the result under a single array.
  *
  * @param array $fields The fields to alias
@@ -460,17 +469,40 @@ class Query extends DatabaseQuery implements JsonSerializable {
 	}
 
 /**
- * Returns the COUNT(*) for the query.
+ * Creates a copy of this current query and resets some state.
  *
- * @return int
+ * The following state will be cleared:
+ *
+ * - autoFields
+ * - limit
+ * - offset
+ * - map/reduce functions
+ * - result formatters
+ * - order
+ * - containments
+ *
+ * This method creates query clones that are useful when working with subqueries.
+ *
+ * @return \Cake\ORM\Query
  */
-	public function count() {
+	public function cleanCopy() {
 		$query = clone $this;
+		$query->autoFields(false);
 		$query->limit(null);
 		$query->order([], true);
 		$query->offset(null);
 		$query->mapReduce(null, null, true);
 		$query->formatResults(null, true);
+		return $query;
+	}
+
+/**
+ * Returns the COUNT(*) for the query.
+ *
+ * @return int
+ */
+	public function count() {
+		$query = $this->cleanCopy();
 		$counter = $this->_counter;
 
 		if ($counter) {
@@ -518,7 +550,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
 	}
 
 /**
- * Toggle hydrating entites.
+ * Toggle hydrating entities.
  *
  * If set to false array results will be returned
  *
@@ -625,7 +657,7 @@ class Query extends DatabaseQuery implements JsonSerializable {
 		$select = $this->clause('select');
 		$this->_hasFields = true;
 
-		if (!count($select)) {
+		if (!count($select) || $this->_autoFields === true) {
 			$this->_hasFields = false;
 			$this->select($this->repository()->schema()->columns());
 			$select = $this->clause('select');
@@ -750,10 +782,44 @@ class Query extends DatabaseQuery implements JsonSerializable {
  *
  * Part of JsonSerializable interface.
  *
- * @return \Cake\ORM\ResultSet The data to convert to JSON.
+ * @return \Cake\Datasource\ResultSetInterface The data to convert to JSON.
  */
 	public function jsonSerialize() {
 		return $this->all();
+	}
+
+/**
+ * Get/Set whether or not the ORM should automatically append fields.
+ *
+ * By default calling select() will disable auto-fields. You can re-enable
+ * auto-fields with this method.
+ *
+ * @param bool $value The value to set or null to read the current value.
+ * @return bool|$this Either the current value or the query object.
+ */
+	public function autoFields($value = null) {
+		if ($value === null) {
+			return $this->_autoFields;
+		}
+		$this->_autoFields = (bool)$value;
+		return $this;
+	}
+
+/**
+ * Decorates the results iterator with MapReduce routines and formatters
+ *
+ * @param \Traversable $result Original results
+ * @return \Cake\Datasource\ResultSetInterface
+ */
+	protected function _decorateResults($result) {
+		$result = $this->_applyDecorators($result);
+
+		if (!($result instanceof ResultSet) && $this->bufferResults()) {
+			$class = $this->_decoratorClass();
+			$result = new $class($result->buffered());
+		}
+
+		return $result;
 	}
 
 }

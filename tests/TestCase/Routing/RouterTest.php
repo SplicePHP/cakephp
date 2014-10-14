@@ -50,9 +50,8 @@ class RouterTest extends TestCase {
 	public function tearDown() {
 		parent::tearDown();
 		Plugin::unload();
-		Router::fullBaseUrl('');
-		Configure::write('App.fullBaseUrl', 'http://localhost');
 		Router::reload();
+		Router::defaultRouteClass('Cake\Routing\Route\Route');
 	}
 
 /**
@@ -278,7 +277,7 @@ class RouterTest extends TestCase {
  * @return void
  */
 	public function testMapResourcesWithExtension() {
-		Router::parseExtensions(['json', 'xml'], false);
+		Router::extensions(['json', 'xml'], false);
 
 		Router::mapResources('Posts', ['_ext' => 'json']);
 		$_SERVER['REQUEST_METHOD'] = 'GET';
@@ -812,7 +811,7 @@ class RouterTest extends TestCase {
 		Router::connect('/reset/*', array('admin' => true, 'controller' => 'users', 'action' => 'reset'));
 		Router::connect('/tests', array('controller' => 'tests', 'action' => 'index'));
 		Router::connect('/admin/:controller/:action/*', array('prefix' => 'admin'));
-		Router::parseExtensions('rss', false);
+		Router::extensions('rss', false);
 
 		$request = new Request();
 		$request->addParams(array(
@@ -987,8 +986,8 @@ class RouterTest extends TestCase {
  * @return void
  */
 	public function testUrlGenerationPrefixedPlugin() {
-		Router::prefix('admin', function($routes) {
-			$routes->plugin('MyPlugin', function($routes) {
+		Router::prefix('admin', function ($routes) {
+			$routes->plugin('MyPlugin', function ($routes) {
 				$routes->fallbacks();
 			});
 		});
@@ -1037,6 +1036,38 @@ class RouterTest extends TestCase {
 	}
 
 /**
+ * test url() when the current request has an extension.
+ *
+ * @return void
+ */
+	public function testUrlGenerationWithExtensionInCurrentRequest() {
+		Router::extensions('rss');
+		Router::scope('/', function ($r) {
+			$r->fallbacks();
+		});
+		$request = new Request();
+		$request->addParams(['controller' => 'Tasks', 'action' => 'index', '_ext' => 'rss']);
+		Router::pushRequest($request);
+
+		$result = Router::url(array(
+			'controller' => 'Tasks',
+			'action' => 'view',
+			1
+		));
+		$expected = '/tasks/view/1';
+		$this->assertEquals($expected, $result);
+
+		$result = Router::url(array(
+			'controller' => 'Tasks',
+			'action' => 'view',
+			1,
+			'_ext' => 'json'
+		));
+		$expected = '/tasks/view/1.json';
+		$this->assertEquals($expected, $result);
+	}
+
+/**
  * Test url generation with named routes.
  */
 	public function testUrlGenerationNamedRoute() {
@@ -1081,7 +1112,7 @@ class RouterTest extends TestCase {
 /**
  * Test that using invalid names causes exceptions.
  *
- * @expectedException \Cake\Routing\Error\MissingRouteException
+ * @expectedException \Cake\Routing\Exception\MissingRouteException
  * @return void
  */
 	public function testNamedRouteException() {
@@ -1493,7 +1524,7 @@ class RouterTest extends TestCase {
 /**
  * Test exceptions when parsing fails.
  *
- * @expectedException Cake\Routing\Error\MissingRouteException
+ * @expectedException Cake\Routing\Exception\MissingRouteException
  */
 	public function testParseError() {
 		Router::connect('/', ['controller' => 'Pages', 'action' => 'display', 'home']);
@@ -1526,23 +1557,12 @@ class RouterTest extends TestCase {
 	}
 
 /**
- * testParseExtensions method
- *
- * @return void
- */
-	public function testParseExtensions() {
-		Router::extensions();
-		Router::parseExtensions('rss', false);
-		$this->assertContains('rss', Router::extensions());
-	}
-
-/**
  * testSetExtensions method
  *
  * @return void
  */
 	public function testSetExtensions() {
-		Router::parseExtensions('rss', false);
+		Router::extensions('rss', false);
 		$this->assertContains('rss', Router::extensions());
 
 		$this->_connectDefaultRoutes();
@@ -1553,7 +1573,7 @@ class RouterTest extends TestCase {
 		$result = Router::parse('/posts.xml');
 		$this->assertFalse(isset($result['_ext']));
 
-		Router::parseExtensions(array('xml'));
+		Router::extensions(array('xml'));
 	}
 
 /**
@@ -1562,17 +1582,16 @@ class RouterTest extends TestCase {
  * @return void
  */
 	public function testExtensionsWithScopedRoutes() {
-		Router::scope('/', function($routes) {
+		Router::scope('/', function ($routes) {
 			$routes->extensions('rss');
 			$routes->connect('/', ['controller' => 'Pages', 'action' => 'index']);
 
-			$routes->scope('/api', function($routes) {
+			$routes->scope('/api', function ($routes) {
 				$routes->extensions('xml');
 				$routes->connect('/docs', ['controller' => 'ApiDocs', 'action' => 'index']);
 			});
 		});
 
-		// json is added by routes in test_app/config/routes.php
 		$this->assertEquals(['rss', 'xml', 'json'], Router::extensions());
 	}
 
@@ -1582,7 +1601,7 @@ class RouterTest extends TestCase {
  * @return void
  */
 	public function testExtensionParsing() {
-		Router::parseExtensions('rss', false);
+		Router::extensions('rss', false);
 		$this->_connectDefaultRoutes();
 
 		$result = Router::parse('/posts.rss');
@@ -1610,7 +1629,7 @@ class RouterTest extends TestCase {
 		$this->assertEquals($expected, $result);
 
 		Router::reload();
-		Router::parseExtensions(['rss', 'xml'], false);
+		Router::extensions(['rss', 'xml'], false);
 		$this->_connectDefaultRoutes();
 
 		$result = Router::parse('/posts.xml');
@@ -1652,7 +1671,7 @@ class RouterTest extends TestCase {
 		$this->assertEquals($expected, $result);
 
 		Router::reload();
-		Router::parseExtensions('rss', false);
+		Router::extensions('rss', false);
 		Router::connect('/controller/action', array('controller' => 'controller', 'action' => 'action', '_ext' => 'rss'));
 		$result = Router::parse('/controller/action');
 		$expected = array(
@@ -1981,7 +2000,7 @@ class RouterTest extends TestCase {
 	public function testParsingWithTrailingPeriodAndParseExtensions() {
 		Router::reload();
 		Router::connect('/:controller/:action/*');
-		Router::parseExtensions('json', false);
+		Router::extensions('json', false);
 
 		$result = Router::parse('/posts/view/something.');
 		$this->assertEquals('something.', $result['pass'][0], 'Period was chopped off %s');
@@ -1993,7 +2012,7 @@ class RouterTest extends TestCase {
 /**
  * test that patterns work for :action
  *
- * @expectedException Cake\Routing\Error\MissingRouteException
+ * @expectedException Cake\Routing\Exception\MissingRouteException
  * @return void
  */
 	public function testParsingWithPatternOnAction() {
@@ -2018,7 +2037,7 @@ class RouterTest extends TestCase {
 /**
  * Test url() works with patterns on :action
  *
- * @expectedException Cake\Routing\Error\MissingRouteException
+ * @expectedException Cake\Routing\Exception\MissingRouteException
  * @return void
  */
 	public function testUrlPatternOnAction() {
@@ -2194,7 +2213,7 @@ class RouterTest extends TestCase {
 /**
  * testRegexRouteMatching error
  *
- * @expectedException Cake\Routing\Error\MissingRouteException
+ * @expectedException Cake\Routing\Exception\MissingRouteException
  * @return void
  */
 	public function testRegexRouteMatchingError() {
@@ -2205,7 +2224,7 @@ class RouterTest extends TestCase {
 /**
  * testRegexRouteMatching method
  *
- * @expectedException Cake\Routing\Error\MissingRouteException
+ * @expectedException Cake\Routing\Exception\MissingRouteException
  * @return void
  */
 	public function testRegexRouteMatchUrl() {
@@ -2276,7 +2295,7 @@ class RouterTest extends TestCase {
 /**
  * test that route classes must extend \Cake\Routing\Route\Route
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException InvalidArgumentException
  * @return void
  */
 	public function testCustomRouteException() {
@@ -2370,7 +2389,7 @@ class RouterTest extends TestCase {
  */
 	public function testReverseWithExtension() {
 		Router::connect('/:controller/:action/*');
-		Router::parseExtensions('json', false);
+		Router::extensions('json', false);
 
 		$request = new Request('/posts/view/1.json');
 		$request->addParams(array(
@@ -2606,7 +2625,7 @@ class RouterTest extends TestCase {
  * @return void
  */
 	public function testScope() {
-		Router::scope('/path', ['param' => 'value'], function($routes) {
+		Router::scope('/path', ['param' => 'value'], function ($routes) {
 			$this->assertInstanceOf('Cake\Routing\RouteBuilder', $routes);
 			$this->assertEquals('/path', $routes->path());
 			$this->assertEquals(['param' => 'value'], $routes->params());
@@ -2631,7 +2650,7 @@ class RouterTest extends TestCase {
  * @return void
  */
 	public function testPrefix() {
-		Router::prefix('admin', function($routes) {
+		Router::prefix('admin', function ($routes) {
 			$this->assertInstanceOf('Cake\Routing\RouteBuilder', $routes);
 			$this->assertEquals('/admin', $routes->path());
 			$this->assertEquals(['prefix' => 'admin'], $routes->params());
@@ -2644,7 +2663,7 @@ class RouterTest extends TestCase {
  * @return void
  */
 	public function testPlugin() {
-		Router::plugin('DebugKit', function($routes) {
+		Router::plugin('DebugKit', function ($routes) {
 			$this->assertInstanceOf('Cake\Routing\RouteBuilder', $routes);
 			$this->assertEquals('/debug_kit', $routes->path());
 			$this->assertEquals(['plugin' => 'DebugKit'], $routes->params());
@@ -2657,11 +2676,42 @@ class RouterTest extends TestCase {
  * @return void
  */
 	public function testPluginOptions() {
-		Router::plugin('DebugKit', ['path' => '/debugger'], function($routes) {
+		Router::plugin('DebugKit', ['path' => '/debugger'], function ($routes) {
 			$this->assertInstanceOf('Cake\Routing\RouteBuilder', $routes);
 			$this->assertEquals('/debugger', $routes->path());
 			$this->assertEquals(['plugin' => 'DebugKit'], $routes->params());
 		});
+	}
+
+/**
+ * Test setting default route class.
+ *
+ * @return void
+ */
+	public function testDefaultRouteClass() {
+		Router::connect('/:controller', ['action' => 'index']);
+		$result = Router::url(['controller' => 'FooBar', 'action' => 'index']);
+		$this->assertEquals('/FooBar', $result);
+
+		// This is needed because tests/boostrap.php sets App.namespace to 'App'
+		Configure::write('App.namespace', 'TestApp');
+
+		Router::defaultRouteClass('DashedRoute');
+		Router::connect('/cake/:controller', ['action' => 'cake']);
+		$result = Router::url(['controller' => 'FooBar', 'action' => 'cake']);
+		$this->assertEquals('/cake/foo-bar', $result);
+
+		$result = Router::url(['controller' => 'FooBar', 'action' => 'index']);
+		$this->assertEquals('/FooBar', $result);
+
+		Router::reload();
+		Router::defaultRouteClass('DashedRoute');
+		Router::scope('/', function ($routes) {
+			$routes->fallbacks();
+		});
+
+		$result = Router::url(['controller' => 'FooBar', 'action' => 'index']);
+		$this->assertEquals('/foo-bar', $result);
 	}
 
 /**
@@ -2670,7 +2720,7 @@ class RouterTest extends TestCase {
  * @return void
  */
 	protected function _connectDefaultRoutes() {
-		Router::scope('/', function($routes) {
+		Router::scope('/', function ($routes) {
 			$routes->fallbacks();
 		});
 	}

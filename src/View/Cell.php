@@ -20,8 +20,8 @@ use Cake\Model\ModelAwareTrait;
 use Cake\Network\Request;
 use Cake\Network\Response;
 use Cake\Utility\Inflector;
-use Cake\View\Error\MissingCellViewException;
-use Cake\View\Error\MissingViewException;
+use Cake\View\Exception\MissingCellViewException;
+use Cake\View\Exception\MissingViewException;
 use Cake\View\ViewVarsTrait;
 
 /**
@@ -88,6 +88,15 @@ abstract class Cell {
 	public $theme;
 
 /**
+ * The helpers this cell uses.
+ *
+ * This property is copied automatically when using the CellTrait
+ *
+ * @var array
+ */
+	public $helpers = [];
+
+/**
  * These properties can be set directly on Cell and passed to the View as options.
  *
  * @var array
@@ -134,7 +143,7 @@ abstract class Cell {
  * @param string $template Custom template name to render. If not provided (null), the last
  * value will be used. This value is automatically set by `CellTrait::cell()`.
  * @return void
- * @throws \Cake\View\Error\MissingCellViewException When a MissingViewException is raised during rendering.
+ * @throws \Cake\View\Exception\MissingCellViewException When a MissingViewException is raised during rendering.
  */
 	public function render($template = null) {
 		if ($template !== null && strpos($template, '/') === false) {

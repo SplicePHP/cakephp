@@ -17,8 +17,8 @@
 namespace Cake\Test\TestCase\Validation;
 
 use Cake\Core\Configure;
+use Cake\Filesystem\File;
 use Cake\TestSuite\TestCase;
-use Cake\Utility\File;
 use Cake\Validation\Validation;
 
 /**
@@ -35,46 +35,6 @@ class CustomValidator {
  */
 	public static function customValidate($check) {
 		return (bool)preg_match('/^[0-9]{3}$/', $check);
-	}
-
-}
-
-/**
- * TestNlValidation class
- *
- * Used to test pass through of Validation
- *
- */
-class TestNlValidation {
-
-/**
- * postal function, for testing postal pass through.
- *
- * @param string $check
- * @return void
- */
-	public static function postal($check) {
-		return true;
-	}
-
-}
-
-/**
- * TestDeValidation class
- *
- * Used to test pass through of Validation
- *
- */
-class TestDeValidation {
-
-/**
- * phone function, for testing phone pass through.
- *
- * @param string $check
- * @return void
- */
-	public static function phone($check) {
-		return true;
 	}
 
 }
@@ -2276,45 +2236,6 @@ class ValidationTest extends TestCase {
 	}
 
 /**
- * Test that phone and postal pass to other classes.
- *
- * @return void
- */
-	public function testPostalPhonePass() {
-		$this->assertTrue(Validation::postal('text', null, __NAMESPACE__ . '\TestNlValidation'));
-		$this->assertTrue(Validation::phone('text', null, __NAMESPACE__ . '\TestDeValidation'));
-	}
-
-/**
- * test pass through failure on postal
- *
- * @expectedException PHPUnit_Framework_Error
- * @return void
- */
-	public function testPassThroughMethodFailure() {
-		Validation::phone('text', null, __NAMESPACE__ . '\TestNlValidation');
-	}
-
-/**
- * test the pass through calling of an alternate locale with postal()
- *
- * @expectedException PHPUnit_Framework_Error
- * @return void
- */
-	public function testPassThroughClassFailure() {
-		Validation::postal('text', null, 'AUTOFAIL');
-	}
-
-/**
- * test pass through method
- *
- * @return void
- */
-	public function testPassThroughMethod() {
-		$this->assertTrue(Validation::postal('text', null, __NAMESPACE__ . '\TestNlValidation'));
-	}
-
-/**
  * testUserDefined method
  *
  * @return void
@@ -2378,7 +2299,7 @@ class ValidationTest extends TestCase {
 /**
  * testMimeTypeFalse method
  *
- * @expectedException \Cake\Error\Exception
+ * @expectedException \RuntimeException
  * @return void
  */
 	public function testMimeTypeFalse() {
@@ -2401,6 +2322,12 @@ class ValidationTest extends TestCase {
 		$this->assertFalse(Validation::uploadError(2));
 		$this->assertFalse(Validation::uploadError(array('error' => 2)));
 		$this->assertFalse(Validation::uploadError(array('error' => '2')));
+
+		$this->assertFalse(Validation::uploadError(UPLOAD_ERR_NO_FILE));
+		$this->assertFalse(Validation::uploadError(UPLOAD_ERR_FORM_SIZE, true));
+		$this->assertFalse(Validation::uploadError(UPLOAD_ERR_INI_SIZE, true));
+		$this->assertFalse(Validation::uploadError(UPLOAD_ERR_NO_TMP_DIR, true));
+		$this->assertTrue(Validation::uploadError(UPLOAD_ERR_NO_FILE, true));
 	}
 
 /**
@@ -2419,6 +2346,122 @@ class ValidationTest extends TestCase {
 
 		$this->assertFalse(Validation::fileSize($image, 'isgreater', 1024));
 		$this->assertFalse(Validation::fileSize(array('tmp_name' => $image), '>', '1KB'));
+	}
+
+/**
+ * Test uploaded file validation.
+ *
+ * @return void
+ */
+	public function testUploadedFileErrorCode() {
+		$this->assertFalse(Validation::uploadedFile('derp'));
+		$invalid = [
+			'name' => 'testing'
+		];
+		$this->assertFalse(Validation::uploadedFile($invalid));
+
+		$file = [
+			'name' => 'cake.power.gif',
+			'tmp_name' => TEST_APP . 'webroot/img/cake.power.gif',
+			'error' => UPLOAD_ERR_OK,
+			'type' => 'image/gif',
+			'size' => 201
+		];
+		$this->assertTrue(Validation::uploadedFile($file));
+
+		$file['error'] = UPLOAD_ERR_NO_FILE;
+		$this->assertFalse(Validation::uploadedFile($file), 'Error upload should fail.');
+	}
+
+/**
+ * Test uploaded file validation.
+ *
+ * @return void
+ */
+	public function testUploadedFileMimeType() {
+		$file = [
+			'name' => 'cake.power.gif',
+			'tmp_name' => TEST_APP . 'webroot/img/cake.power.gif',
+			'error' => UPLOAD_ERR_OK,
+			'type' => 'text/plain',
+			'size' => 201
+		];
+		$options = [
+			'types' => ['text/plain']
+		];
+		$this->assertFalse(Validation::uploadedFile($file, $options), 'Incorrect mimetype.');
+
+		$options = [
+			'types' => ['image/gif', 'image/png']
+		];
+		$this->assertTrue(Validation::uploadedFile($file, $options));
+	}
+
+/**
+ * Test uploaded file validation.
+ *
+ * @return void
+ */
+	public function testUploadedFileSize() {
+		$file = [
+			'name' => 'cake.power.gif',
+			'tmp_name' => TEST_APP . 'webroot/img/cake.power.gif',
+			'error' => UPLOAD_ERR_OK,
+			'type' => 'text/plain',
+			'size' => 201
+		];
+		$options = [
+			'minSize' => 500
+		];
+		$this->assertFalse(Validation::uploadedFile($file, $options), 'Too small');
+
+		$options = [
+			'maxSize' => 100
+		];
+		$this->assertFalse(Validation::uploadedFile($file, $options), 'Too big');
+	}
+
+/**
+ * Test uploaded file validation.
+ *
+ * @return void
+ */
+	public function testUploadedFileNoFile() {
+		$file = [
+			'name' => '',
+			'tmp_name' => TEST_APP . 'webroot/img/cake.power.gif',
+			'error' => UPLOAD_ERR_NO_FILE,
+			'type' => '',
+			'size' => 0
+		];
+		$options = [
+			'optional' => true,
+			'minSize' => 500,
+			'types' => ['image/gif', 'image/png']
+		];
+		$this->assertTrue(Validation::uploadedFile($file, $options), 'No file should be ok.');
+
+		$options = [
+			'optional' => false
+		];
+		$this->assertFalse(Validation::uploadedFile($file, $options), 'File is required.');
+	}
+
+/**
+ * Test uploaded file validation.
+ *
+ * @return void
+ */
+	public function testUploadedFileWithDifferentFileParametersOrder() {
+		$file = [
+			'name' => 'cake.power.gif',
+			'error' => UPLOAD_ERR_OK,
+			'tmp_name' => TEST_APP . 'webroot/img/cake.power.gif',
+			'type' => 'text/plain',
+			'size' => 201
+		];
+		$options = [];
+		$this->assertTrue(Validation::uploadedFile($file, $options), 'Wrong order');
 	}
 
 }

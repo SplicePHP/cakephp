@@ -121,6 +121,44 @@ abstract class Driver {
 	public abstract function rollbackTransaction();
 
 /**
+ * Get the SQL for releasing a save point.
+ *
+ * @param string $name The table name
+ * @return string
+ */
+	public abstract function releaseSavePointSQL($name);
+
+/**
+ * Get the SQL for creating a save point.
+ *
+ * @param string $name The table name
+ * @return string
+ */
+	public abstract function savePointSQL($name);
+
+/**
+ * Get the SQL for rollingback a save point.
+ *
+ * @param string $name The table name
+ * @return string
+ */
+	public abstract function rollbackSavePointSQL($name);
+
+/**
+ * Get the SQL for disabling foreign keys
+ *
+ * @return string
+ */
+	public abstract function disableForeignKeySQL();
+
+/**
+ * Get the SQL for enabling foreign keys
+ *
+ * @return string
+ */
+	public abstract function enableForeignKeySQL();
+
+/**
  * Returns whether this driver supports save points for nested transactions
  *
  * @return bool true if save points are supported, false otherwise
@@ -251,8 +289,8 @@ abstract class Driver {
  *
  * @param \Cake\Database\Query $query The query to compile.
  * @param \Cake\Database\ValueBinder $generator The value binder to use.
- * @return array containing 2 entries. The first enty is the transformed query
- * and the secod one the compiled SQL
+ * @return array containing 2 entries. The first entity is the transformed query
+ * and the second one the compiled SQL
  */
 	public function compileQuery(Query $query, ValueBinder $generator) {
 		$processor = $this->newCompiler();
@@ -275,6 +313,18 @@ abstract class Driver {
  */
 	public function __destruct() {
 		$this->_connection = null;
+	}
+
+/**
+ * Returns an array that can be used to describe the internal state of this
+ * object.
+ *
+ * @return array
+ */
+	public function __debugInfo() {
+		return [
+			'connected' => $this->isConnected()
+		];
 	}
 
 }

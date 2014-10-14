@@ -15,7 +15,6 @@
 namespace Cake\Database\Log;
 
 use Cake\Log\Log;
-use Cake\Utility\String;
 
 /**
  * This class is a bridge used to write LoggedQuery objects into a real log.
@@ -57,14 +56,19 @@ class QueryLogger {
  * @return string
  */
 	protected function _interpolate($query) {
-		$params = array_map(function($p) {
+		$params = array_map(function ($p) {
 			if ($p === null) {
 				return 'NULL';
 			}
 			return is_string($p) ? "'$p'" : $p;
 		}, $query->params);
 
-		return String::insert($query->query, $params);
+		$keys = [];
+		foreach ($params as $key => $param) {
+			$keys[] = is_string($key) ? "/:$key/" : '/[?]/';
+		}
+
+		return preg_replace($keys, $params, $query->query, 1);
 	}
 
 }

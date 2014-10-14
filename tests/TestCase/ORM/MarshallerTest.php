@@ -14,12 +14,12 @@
  */
 namespace Cake\Test\TestCase\ORM;
 
+use Cake\I18n\Time;
 use Cake\ORM\Entity;
 use Cake\ORM\Marshaller;
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
-use Cake\Utility\Time;
 
 /**
  * Test entity for mass assignment.
@@ -49,7 +49,7 @@ class ProtectedArticle extends Entity {
  */
 class MarshallerTest extends TestCase {
 
-	public $fixtures = ['core.tag', 'core.articles_tag', 'core.article', 'core.user', 'core.comment'];
+	public $fixtures = ['core.tags', 'core.articles_tags', 'core.articles', 'core.users', 'core.comments'];
 
 /**
  * setup
@@ -203,6 +203,34 @@ class MarshallerTest extends TestCase {
 		$this->assertInstanceOf(__NAMESPACE__ . '\ProtectedArticle', $result);
 		$this->assertNull($result->author_id);
 		$this->assertNull($result->not_in_schema);
+	}
+
+/**
+ * Test one() supports accessibleFields option
+ *
+ * @return void
+ */
+	public function testOneAccessibleFieldsOption() {
+		$data = [
+			'title' => 'My title',
+			'body' => 'My content',
+			'author_id' => 1,
+			'not_in_schema' => true
+		];
+		$this->articles->entityClass(__NAMESPACE__ . '\ProtectedArticle');
+
+		$marshall = new Marshaller($this->articles);
+
+		$result = $marshall->one($data, ['accessibleFields' => ['body' => false]]);
+		$this->assertNull($result->body);
+
+		$result = $marshall->one($data, ['accessibleFields' => ['author_id' => true]]);
+		$this->assertEquals($data['author_id'], $result->author_id);
+		$this->assertNull($result->not_in_schema);
+
+		$result = $marshall->one($data, ['accessibleFields' => ['*' => true]]);
+		$this->assertEquals($data['author_id'], $result->author_id);
+		$this->assertTrue($result->not_in_schema);
 	}
 
 /**

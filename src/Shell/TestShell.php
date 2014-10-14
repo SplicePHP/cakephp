@@ -18,12 +18,7 @@
  */
 namespace Cake\Shell;
 
-use Cake\Console\ConsoleOptionParser;
 use Cake\Console\Shell;
-use Cake\TestSuite\TestLoader;
-use Cake\TestSuite\TestSuiteCommand;
-use Cake\TestSuite\TestSuiteDispatcher;
-use Cake\Utility\Inflector;
 
 /**
  * Stub that tells people how to run tests with PHPUnit.
@@ -58,12 +53,12 @@ class TestShell extends Shell {
  * @return void
  */
 	public function outputWarning() {
-		$this->err('<error>Test Shell has been removed.</error>');
+		$this->err('<error>TestShell has been removed.</error>');
 		$this->err('');
-		$this->err('TestShell has been removed and replaced with <info>phpunit</info>.');
+		$this->err('TestShell has been replaced with <info>`phpunit`</info>.');
 		$this->err('');
-		$this->err('To run your application tests run <info>phpunit --stderr</info>');
-		$this->err('To run plugin tests, cd into the plugin directory and run <info>phpunit --stderr</info>');
+		$this->err('To run your application tests run <info>`phpunit`</info>.');
+		$this->err('To run plugin tests, cd into the plugin directory and run <info>`phpunit`</info>.');
 	}
 
 }

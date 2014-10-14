@@ -106,7 +106,7 @@ class Route {
 			unset($this->defaults['[method]']);
 		}
 		if (isset($this->options['_ext'])) {
-			$this->_extensions = $this->options['_ext'];
+			$this->_extensions = (array)$this->options['_ext'];
 		}
 	}
 
@@ -250,7 +250,7 @@ class Route {
  * false will be returned. String URLs are parsed if they match a routes regular expression.
  *
  * @param string $url The URL to attempt to parse.
- * @return mixed Boolean false on failure, otherwise an array or parameters
+ * @return array|false Boolean false on failure, otherwise an array of parameters.
  */
 	public function parse($url) {
 		$request = Router::getRequest(true) ?: Request::createFromGlobals();
@@ -430,6 +430,17 @@ class Route {
 			return false;
 		}
 
+		// If this route uses pass option, and the passed elements are
+		// not set, rekey elements.
+		if (isset($this->options['pass'])) {
+			foreach ($this->options['pass'] as $i => $name) {
+				if (isset($url[$i]) && !isset($url[$name])) {
+					$url[$name] = $url[$i];
+					unset($url[$i]);
+				}
+			}
+		}
+
 		// check that all the key names are in the url
 		$keyNames = array_flip($this->keys);
 		if (array_intersect_key($keyNames, $url) !== $keyNames) {
@@ -519,28 +530,26 @@ class Route {
 		$pass = implode('/', array_map('rawurlencode', $pass));
 		$out = $this->template;
 
-		if (!empty($this->keys)) {
-			$search = $replace = [];
-
-			foreach ($this->keys as $key) {
-				$string = null;
-				if (isset($params[$key])) {
-					$string = $params[$key];
-				} elseif (strpos($out, $key) != strlen($out) - strlen($key)) {
-					$key .= '/';
-				}
-				$search[] = ':' . $key;
-				$replace[] = $string;
+		$search = $replace = [];
+		foreach ($this->keys as $key) {
+			$string = null;
+			if (isset($params[$key])) {
+				$string = $params[$key];
+			} elseif (strpos($out, $key) != strlen($out) - strlen($key)) {
+				$key .= '/';
 			}
-			$out = str_replace($search, $replace, $out);
+			$search[] = ':' . $key;
+			$replace[] = $string;
 		}
 
 		if (strpos($this->template, '**') !== false) {
-			$out = str_replace('**', $pass, $out);
-			$out = str_replace('%2F', '/', $out);
+			array_push($search, '**', '%2F');
+			array_push($replace, $pass, '/');
 		} elseif (strpos($this->template, '*') !== false) {
-			$out = str_replace('*', $pass, $out);
+			$search[] = '*';
+			$replace[] = $pass;
 		}
+		$out = str_replace($search, $replace, $out);
 
 		// add base url if applicable.
 		if (isset($params['_base'])) {
@@ -549,7 +558,6 @@ class Route {
 		}
 
 		$out = str_replace('//', '/', $out);
-
 		if (
 			isset($params['_scheme']) ||
 			isset($params['_host']) ||
@@ -561,12 +569,7 @@ class Route {
 			if (isset($params['_port'])) {
 				$host .= ':' . $params['_port'];
 			}
-			$out = sprintf(
-				'%s://%s%s',
-				$params['_scheme'],
-				$host,
-				$out
-			);
+			$out = "{$params['_scheme']}://{$host}{$out}";
 		}
 		if (!empty($params['_ext']) || !empty($query)) {
 			$out = rtrim($out, '/');

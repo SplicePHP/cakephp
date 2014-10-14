@@ -24,7 +24,7 @@ use Cake\TestSuite\TestCase;
  */
 class ConnectionTest extends TestCase {
 
-	public $fixtures = ['core.thing'];
+	public $fixtures = ['core.things'];
 
 	public function setUp() {
 		$this->connection = ConnectionManager::get('test');
@@ -64,7 +64,7 @@ class ConnectionTest extends TestCase {
 /**
  * Tests creating a connection using no driver throws an exception
  *
- * @expectedException \Cake\Database\Error\MissingDriverException
+ * @expectedException \Cake\Database\Exception\MissingDriverException
  * @expectedExceptionMessage Database driver  could not be found.
  * @return void
  */
@@ -75,7 +75,7 @@ class ConnectionTest extends TestCase {
 /**
  * Tests creating a connection using an invalid driver throws an exception
  *
- * @expectedException \Cake\Database\Error\MissingDriverException
+ * @expectedException \Cake\Database\Exception\MissingDriverException
  * @expectedExceptionMessage Database driver  could not be found.
  * @return void
  */
@@ -86,7 +86,7 @@ class ConnectionTest extends TestCase {
 /**
  * Tests creating a connection using an invalid driver throws an exception
  *
- * @expectedException \Cake\Database\Error\MissingDriverException
+ * @expectedException \Cake\Database\Exception\MissingDriverException
  * @expectedExceptionMessage Database driver \Foo\InvalidDriver could not be found.
  * @return void
  */
@@ -97,7 +97,7 @@ class ConnectionTest extends TestCase {
 /**
  * Tests trying to use a disabled driver throws an exception
  *
- * @expectedException \Cake\Database\Error\MissingExtensionException
+ * @expectedException \Cake\Database\Exception\MissingExtensionException
  * @expectedExceptionMessage Database driver DriverMock cannot be used due to a missing PHP extension or unmet dependency
  * @return void
  */
@@ -109,7 +109,7 @@ class ConnectionTest extends TestCase {
 /**
  * Tests that connecting with invalid credentials or database name throws an exception
  *
- * @expectedException \Cake\Database\Error\MissingConnectionException
+ * @expectedException \Cake\Database\Exception\MissingConnectionException
  * @return void
  */
 	public function testWrongCredentials() {
@@ -758,7 +758,7 @@ class ConnectionTest extends TestCase {
 		);
 		$connection->expects($this->at(0))->method('begin');
 		$connection->expects($this->at(1))->method('commit');
-		$result = $connection->transactional(function($conn) use ($connection) {
+		$result = $connection->transactional(function ($conn) use ($connection) {
 			$this->assertSame($connection, $conn);
 			return 'thing';
 		});
@@ -781,7 +781,7 @@ class ConnectionTest extends TestCase {
 		$connection->expects($this->at(0))->method('begin');
 		$connection->expects($this->at(1))->method('rollback');
 		$connection->expects($this->never())->method('commit');
-		$result = $connection->transactional(function($conn) use ($connection) {
+		$result = $connection->transactional(function ($conn) use ($connection) {
 			$this->assertSame($connection, $conn);
 			return false;
 		});
@@ -806,10 +806,31 @@ class ConnectionTest extends TestCase {
 		$connection->expects($this->at(0))->method('begin');
 		$connection->expects($this->at(1))->method('rollback');
 		$connection->expects($this->never())->method('commit');
-		$connection->transactional(function($conn) use ($connection) {
+		$connection->transactional(function ($conn) use ($connection) {
 			$this->assertSame($connection, $conn);
 			throw new \InvalidArgumentException;
 		});
+	}
+
+/**
+ * Tests it is possible to set a schema collection object
+ *
+ * @return void
+ */
+	public function testSchemaCollection() {
+		$driver = $this->getMockFormDriver();
+		$connection = $this->getMock(
+			'\Cake\Database\Connection',
+			['connect'],
+			[['driver' => $driver]]
+		);
+
+		$schema = $connection->schemaCollection();
+		$this->assertInstanceOf('Cake\Database\Schema\Collection', $schema);
+
+		$schema = $this->getMock('Cake\Database\Schema\Collection', [], [$connection]);
+		$connection->schemaCollection($schema);
+		$this->assertSame($schema, $connection->schemaCollection());
 	}
 
 }

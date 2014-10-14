@@ -14,16 +14,20 @@
  */
 namespace Cake\Console;
 
+use Cake\Console\ConsoleIo;
+use Cake\Console\Exception\MissingShellException;
 use Cake\Core\App;
 use Cake\Core\Configure;
-use Cake\Error\Exception;
+use Cake\Core\Exception\Exception;
+use Cake\Core\Plugin;
+use Cake\Log\Log;
+use Cake\Shell\Task\CommandTask;
 use Cake\Utility\Inflector;
 
 /**
  * Shell dispatcher handles dispatching cli commands.
  *
- * Consult https://github.com/cakephp/app/tree/master/App/Console/cake.php
- * for how this class is used in practice.
+ * Consult /bin/cake.php for how this class is used in practice.
  */
 class ShellDispatcher {
 
@@ -54,6 +58,8 @@ class ShellDispatcher {
 		set_time_limit(0);
 		$this->args = (array)$args;
 
+		$this->addShortPluginAliases();
+
 		if ($bootstrap) {
 			$this->_initEnvironment();
 		}
@@ -68,12 +74,27 @@ class ShellDispatcher {
  *
  * If you re-use an alias the last alias set will be the one available.
  *
+ * ### Usage
+ *
+ * Aliasing a shell named ClassName:
+ *
+ * `$this->alias('alias', 'ClassName');`
+ *
+ * Getting the original name for a given alias:
+ *
+ * `$this->alias('alias');`
+ *
  * @param string $short The new short name for the shell.
- * @param string $original The original full name for the shell.
- * @return void
+ * @param string|null $original The original full name for the shell.
+ * @return string|false The aliased class name, or false if the alias does not exist
  */
-	public static function alias($short, $original) {
-		static::$_aliases[$short] = $original;
+	public static function alias($short, $original = null) {
+		$short = Inflector::camelize($short);
+		if ($original) {
+			static::$_aliases[$short] = $original;
+		}
+
+		return isset(static::$_aliases[$short]) ? static::$_aliases[$short] : false;
 	}
 
 /**
@@ -100,7 +121,7 @@ class ShellDispatcher {
  * Defines current working environment.
  *
  * @return void
- * @throws \Cake\Error\Exception
+ * @throws \Cake\Core\Exception\Exception
  */
 	protected function _initEnvironment() {
 		if (!$this->_bootstrap()) {
@@ -143,7 +164,7 @@ class ShellDispatcher {
  * Dispatch a request.
  *
  * @return bool
- * @throws \Cake\Console\Error\MissingShellMethodException
+ * @throws \Cake\Console\Exception\MissingShellMethodException
  */
 	protected function _dispatch() {
 		$shell = $this->shiftArgs();
@@ -164,29 +185,94 @@ class ShellDispatcher {
 	}
 
 /**
+ * For all loaded plugins, add a short alias
+ *
+ * This permits a plugin which implements a shell of the same name to be accessed
+ * Using the shell name alone
+ *
+ * @return void
+ */
+	public function addShortPluginAliases() {
+		$plugins = Plugin::loaded();
+
+		$io = new ConsoleIo();
+		$task = new CommandTask($io);
+		$io->setLoggers(false);
+		$list = $task->getShellList() + ['app' => []];
+		$fixed = array_flip($list['app']) + array_flip($list['CORE']);
+		$aliases = [];
+
+		foreach ($plugins as $plugin) {
+			if (!isset($list[$plugin])) {
+				continue;
+			}
+
+			foreach ($list[$plugin] as $shell) {
+				if (isset($aliases[$shell])) {
+					$other = $aliased[$shell];
+					Log::write(
+						'debug',
+						"command '$shell' in plugin '$plugin' was not aliased, conflicts with '$other'",
+						['shell-dispatcher']
+					);
+				}
+				$aliases += [$shell => $plugin];
+			}
+		}
+
+		foreach ($aliases as $shell => $plugin) {
+			if (isset($fixed[$shell])) {
+				Log::write(
+					'debug',
+					"command '$shell' in plugin '$plugin' was not aliased, conflicts with another shell",
+					['shell-dispatcher']
+				);
+				continue;
+			}
+			static::alias($shell, "$plugin.$shell");
+		}
+	}
+
+/**
  * Get shell to use, either plugin shell or application shell
  *
- * All paths in the loaded shell paths are searched.
+ * All paths in the loaded shell paths are searched, handles alias
+ * dereferencing
  *
  * @param string $shell Optionally the name of a plugin
  * @return \Cake\Console\Shell A shell instance.
- * @throws \Cake\Console\Error\MissingShellException when errors are encountered.
+ * @throws \Cake\Console\Exception\MissingShellException when errors are encountered.
  */
 	public function findShell($shell) {
 		$className = $this->_shellExists($shell);
-		if (!$className && isset(static::$_aliases[$shell])) {
-			$shell = static::$_aliases[$shell];
+		if (!$className) {
+			$shell = $this->_handleAlias($shell);
 			$className = $this->_shellExists($shell);
 		}
-		if ($className) {
-			list($plugin) = pluginSplit($shell);
-			$instance = new $className();
-			$instance->plugin = Inflector::camelize(trim($plugin, '.'));
-			return $instance;
+
+		if (!$className) {
+			throw new MissingShellException([
+				'class' => $shell,
+			]);
 		}
-		throw new Error\MissingShellException([
-			'class' => $shell,
-		]);
+
+		return $this->_createShell($className, $shell);
+	}
+
+/**
+ * If the input matches an alias, return the aliased shell name
+ *
+ * @param string $shell Optionally the name of a plugin or alias
+ * @return string Shell name with plugin prefix
+ */
+	protected function _handleAlias($shell) {
+		$aliased = static::alias($shell);
+		if ($aliased) {
+			$shell = $aliased;
+		}
+
+		$class = array_map('Cake\Utility\Inflector::camelize', explode('.', $shell));
+		return implode('.', $class);
 	}
 
 /**
@@ -196,13 +282,25 @@ class ShellDispatcher {
  * @return string|bool Either the classname or false.
  */
 	protected function _shellExists($shell) {
-		$class = array_map('Cake\Utility\Inflector::camelize', explode('.', $shell));
-		$class = implode('.', $class);
-		$class = App::className($class, 'Shell', 'Shell');
+		$class = App::className($shell, 'Shell', 'Shell');
 		if (class_exists($class)) {
 			return $class;
 		}
 		return false;
+	}
+
+/**
+ * Create the given shell name, and set the plugin property
+ *
+ * @param string $className The class name to instantiate
+ * @param string $shortName The plugin-prefixed shell name
+ * @return \Cake\Console\Shell A shell instance.
+ */
+	protected function _createShell($className, $shortName) {
+		list($plugin) = pluginSplit($shortName);
+		$instance = new $className();
+		$instance->plugin = trim($plugin, '.');
+		return $instance;
 	}
 
 /**

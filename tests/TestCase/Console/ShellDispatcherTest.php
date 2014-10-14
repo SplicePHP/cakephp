@@ -51,7 +51,7 @@ class ShellDispatcherTest extends TestCase {
 /**
  * Test error on missing shell
  *
- * @expectedException Cake\Console\Error\MissingShellException
+ * @expectedException Cake\Console\Exception\MissingShellException
  * @return void
  */
 	public function testFindShellMissing() {
@@ -61,7 +61,7 @@ class ShellDispatcherTest extends TestCase {
 /**
  * Test error on missing plugin shell
  *
- * @expectedException Cake\Console\Error\MissingShellException
+ * @expectedException Cake\Console\Exception\MissingShellException
  * @return void
  */
 	public function testFindShellMissingPlugin() {
@@ -166,6 +166,87 @@ class ShellDispatcherTest extends TestCase {
 		$dispatcher->args = array('mock_without_main', 'initdb');
 		$result = $dispatcher->dispatch();
 		$this->assertEquals(0, $result);
+	}
+
+/**
+ * Verify you can dispatch a plugin's main shell with the shell name alone
+ *
+ * @return void
+ */
+	public function testDispatchShortPluginAlias() {
+		$dispatcher = $this->getMock(
+			'Cake\Console\ShellDispatcher',
+			['_shellExists', '_createShell']
+		);
+		$Shell = $this->getMock('Cake\Console\Shell');
+
+		$dispatcher->expects($this->at(1))
+			->method('_shellExists')
+			->with('TestPlugin.Example')
+			->will($this->returnValue('TestPlugin\Console\Command\TestPluginShell'));
+
+		$dispatcher->expects($this->at(2))
+			->method('_createShell')
+			->with('TestPlugin\Console\Command\TestPluginShell', 'TestPlugin.Example')
+			->will($this->returnValue($Shell));
+
+		$dispatcher->args = array('example');
+		$result = $dispatcher->dispatch();
+		$this->assertEquals(1, $result);
+	}
+
+/**
+ * Ensure short plugin shell usage is case/camelized insensitive
+ *
+ * @return void
+ */
+	public function testDispatchShortPluginAliasCamelized() {
+		$dispatcher = $this->getMock(
+			'Cake\Console\ShellDispatcher',
+			['_shellExists', '_createShell']
+		);
+		$Shell = $this->getMock('Cake\Console\Shell');
+
+		$dispatcher->expects($this->at(1))
+			->method('_shellExists')
+			->with('TestPlugin.Example')
+			->will($this->returnValue('TestPlugin\Console\Command\TestPluginShell'));
+
+		$dispatcher->expects($this->at(2))
+			->method('_createShell')
+			->with('TestPlugin\Console\Command\TestPluginShell', 'TestPlugin.Example')
+			->will($this->returnValue($Shell));
+
+		$dispatcher->args = ['Example'];
+		$result = $dispatcher->dispatch();
+		$this->assertEquals(1, $result);
+	}
+
+/**
+ * Verify that in case of conflict, app shells take precedence in alias list
+ *
+ * @return void
+ */
+	public function testDispatchShortPluginAliasConflict() {
+		$dispatcher = $this->getMock(
+			'Cake\Console\ShellDispatcher',
+			['_shellExists', '_createShell']
+		);
+		$Shell = $this->getMock('Cake\Console\Shell');
+
+		$dispatcher->expects($this->at(1))
+			->method('_shellExists')
+			->with('Sample')
+			->will($this->returnValue('App\Shell\SampleShell'));
+
+		$dispatcher->expects($this->at(2))
+			->method('_createShell')
+			->with('App\Shell\SampleShell', 'Sample')
+			->will($this->returnValue($Shell));
+
+		$dispatcher->args = array('sample');
+		$result = $dispatcher->dispatch();
+		$this->assertEquals(1, $result);
 	}
 
 /**

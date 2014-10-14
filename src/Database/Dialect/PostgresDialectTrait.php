@@ -15,7 +15,6 @@
 namespace Cake\Database\Dialect;
 
 use Cake\Database\Expression\FunctionExpression;
-use Cake\Database\Query;
 use Cake\Database\SqlDialectTrait;
 
 /**
@@ -104,7 +103,7 @@ trait PostgresDialectTrait {
 				$expression
 					->name('')
 					->type('-')
-					->iterateParts(function($p) {
+					->iterateParts(function ($p) {
 						return new FunctionExpression('DATE', [$p['value']], [$p['type']]);
 					});
 				break;
@@ -135,5 +134,19 @@ trait PostgresDialectTrait {
 			$this->_schemaDialect = new \Cake\Database\Schema\PostgresSchema($this);
 		}
 		return $this->_schemaDialect;
+	}
+
+/**
+ * {@inheritDoc}
+ */
+	public function disableForeignKeySQL() {
+		return 'SET CONSTRAINTS ALL DEFERRED';
+	}
+
+/**
+ * {@inheritDoc}
+ */
+	public function enableForeignKeySQL() {
+		return 'SET CONSTRAINTS ALL IMMEDIATE';
 	}
 }

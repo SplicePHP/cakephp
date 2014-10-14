@@ -34,7 +34,7 @@ class PostgresSchema extends BaseSchema {
 /**
  * {@inheritDoc}
  */
-	public function describeColumnSql($name, $config) {
+	public function describeColumnSql($tableName, $config) {
 		$sql =
 		'SELECT DISTINCT table_schema AS schema, column_name AS name, data_type AS type,
 			is_nullable AS null, column_default AS default,
@@ -50,7 +50,7 @@ class PostgresSchema extends BaseSchema {
 		ORDER BY ordinal_position';
 
 		$schema = empty($config['schema']) ? 'public' : $config['schema'];
-		return [$sql, [$name, $schema, $config['database']]];
+		return [$sql, [$tableName, $schema, $config['database']]];
 	}
 
 /**
@@ -135,10 +135,9 @@ class PostgresSchema extends BaseSchema {
 				$row['default'] = 0;
 			}
 		}
-
 		$field += [
+			'default' => $this->_defaultValue($row['default']),
 			'null' => $row['null'] === 'YES' ? true : false,
-			'default' => $row['default'],
 			'comment' => $row['comment']
 		];
 		$field['length'] = $row['char_length'] ?: $field['length'];
@@ -146,9 +145,35 @@ class PostgresSchema extends BaseSchema {
 	}
 
 /**
+ * Manipulate the default value.
+ *
+ * Postgres includes sequence data and casting information in default values.
+ * We need to remove those.
+ *
+ * @param string $default The default value.
+ * @return string
+ */
+	protected function _defaultValue($default) {
+		if (is_numeric($default) || $default === null) {
+			return $default;
+		}
+		// Sequences
+		if (strpos($default, 'nextval') === 0) {
+			return null;
+		}
+
+		// Remove quotes and postgres casts
+		return preg_replace(
+			"/^'(.*)'(?:::.*)$/",
+			"$1",
+			$default
+		);
+	}
+
+/**
  * {@inheritDoc}
  */
-	public function describeIndexSql($table, $config) {
+	public function describeIndexSql($tableName, $config) {
 		$sql = 'SELECT
 			c2.relname,
 			i.indisprimary,
@@ -173,7 +198,7 @@ class PostgresSchema extends BaseSchema {
 		if (!empty($config['schema'])) {
 			$schema = $config['schema'];
 		}
-		return [$sql, [$table, $schema]];
+		return [$sql, [$tableName, $schema]];
 	}
 
 /**
@@ -201,7 +226,8 @@ class PostgresSchema extends BaseSchema {
 			$columnDef = $table->column($columns[0]);
 			if (
 				count($columns) === 1 &&
-				in_array($columnDef['type'], ['integer', 'biginteger'])
+				in_array($columnDef['type'], ['integer', 'biginteger']) &&
+				$type === Table::CONSTRAINT_PRIMARY
 			) {
 				$columnDef['autoIncrement'] = true;
 				$table->addColumn($columns[0], $columnDef);
@@ -231,7 +257,7 @@ class PostgresSchema extends BaseSchema {
 /**
  * {@inheritDoc}
  */
-	public function describeForeignKeySql($table, $config) {
+	public function describeForeignKeySql($tableName, $config) {
 		$sql = "SELECT
 			r.conname AS name,
 			r.confupdtype AS update_type,
@@ -249,7 +275,7 @@ class PostgresSchema extends BaseSchema {
 			AND r.contype = 'f'";
 
 		$schema = empty($config['schema']) ? 'public' : $config['schema'];
-		return [$sql, [$table, $schema]];
+		return [$sql, [$tableName, $schema]];
 	}
 
 /**
@@ -402,7 +428,7 @@ class PostgresSchema extends BaseSchema {
 		);
 		if ($data['type'] === Table::CONSTRAINT_FOREIGN) {
 			return $prefix . sprintf(
-				' FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE %s ON DELETE %s',
+				' FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE %s ON DELETE %s DEFERRABLE INITIALLY IMMEDIATE',
 				implode(', ', $columns),
 				$this->_driver->quoteIdentifier($data['references'][0]),
 				$this->_driver->quoteIdentifier($data['references'][1]),
@@ -445,8 +471,22 @@ class PostgresSchema extends BaseSchema {
 	public function truncateTableSql(Table $table) {
 		$name = $this->_driver->quoteIdentifier($table->name());
 		return [
-			sprintf('TRUNCATE %s RESTART IDENTITY', $name)
+			sprintf('TRUNCATE %s RESTART IDENTITY CASCADE', $name)
 		];
+	}
+
+/**
+ * Generate the SQL to drop a table.
+ *
+ * @param \Cake\Database\Schema\Table $table Table instance
+ * @return array SQL statements to drop a table.
+ */
+	public function dropTableSql(Table $table) {
+		$sql = sprintf(
+			'DROP TABLE %s CASCADE',
+			$this->_driver->quoteIdentifier($table->name())
+		);
+		return [$sql];
 	}
 
 }

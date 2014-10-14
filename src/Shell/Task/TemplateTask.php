@@ -16,9 +16,9 @@ namespace Cake\Shell\Task;
 
 use Cake\Console\Shell;
 use Cake\Core\App;
+use Cake\Core\ConventionsTrait;
 use Cake\Core\Plugin;
-use Cake\Utility\ConventionsTrait;
-use Cake\Utility\Folder;
+use Cake\Filesystem\Folder;
 use Cake\View\ViewVarsTrait;
 
 /**
@@ -60,7 +60,7 @@ class TemplateTask extends Shell {
 
 		$plugins = Plugin::loaded();
 		foreach ($plugins as $plugin) {
-			$paths[] = Plugin::classPath($plugin) . DS . 'Template' . DS;
+			$paths[] = Plugin::classPath($plugin) . 'Template' . DS;
 		}
 
 		$core = current(App::core('Template'));

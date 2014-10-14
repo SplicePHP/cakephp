@@ -14,7 +14,8 @@
  */
 namespace Cake\Model;
 
-use Cake\Error\Exception;
+use Cake\Model\Exception\MissingModelException;
+use InvalidArgumentException;
 
 /**
  * Provides functionality for loading table classes
@@ -70,9 +71,9 @@ trait ModelAwareTrait {
  * @param string $modelClass Name of model class to load. Defaults to $this->modelClass
  * @param string $type The type of repository to load. Defaults to 'Table' which
  *   delegates to Cake\ORM\TableRegistry.
- * @return bool True when single repository found and instance created.
- * @throws \Cake\Model\Error\MissingModelException If the model class cannot be found.
- * @throws \Cake\Error\Exception When using a type that has not been registered.
+ * @return object The model instance created.
+ * @throws \Cake\Model\Exception\MissingModelException If the model class cannot be found.
+ * @throws \InvalidArgumentException When using a type that has not been registered.
  */
 	public function loadModel($modelClass = null, $type = 'Table') {
 		if ($modelClass === null) {
@@ -80,13 +81,13 @@ trait ModelAwareTrait {
 		}
 
 		if (isset($this->{$modelClass})) {
-			return true;
+			return $this->{$modelClass};
 		}
 
 		list($plugin, $modelClass) = pluginSplit($modelClass, true);
 
 		if (!isset($this->_modelFactories[$type])) {
-			throw new Exception(sprintf(
+			throw new InvalidArgumentException(sprintf(
 				'Unknown repository type "%s". Make sure you register a type before trying to use it.',
 				$type
 			));
@@ -94,9 +95,9 @@ trait ModelAwareTrait {
 		$factory = $this->_modelFactories[$type];
 		$this->{$modelClass} = $factory($plugin . $modelClass);
 		if (!$this->{$modelClass}) {
-			throw new Error\MissingModelException([$modelClass, $type]);
+			throw new MissingModelException([$modelClass, $type]);
 		}
-		return true;
+		return $this->{$modelClass};
 	}
 
 /**

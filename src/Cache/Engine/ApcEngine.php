@@ -16,7 +16,6 @@ namespace Cake\Cache\Engine;
 
 use APCIterator;
 use Cake\Cache\CacheEngine;
-use Cake\Utility\Inflector;
 
 /**
  * APC storage engine for cache
@@ -41,9 +40,6 @@ class ApcEngine extends CacheEngine {
  * @return bool True if the engine has been successfully initialized, false if not
  */
 	public function init(array $config = []) {
-		if (!isset($config['prefix'])) {
-			$config['prefix'] = Inflector::slug(APP_DIR) . '_';
-		}
 		parent::init($config);
 		return function_exists('apc_dec');
 	}
@@ -71,13 +67,14 @@ class ApcEngine extends CacheEngine {
  * Read a key from the cache
  *
  * @param string $key Identifier for the data
- * @return mixed The cached data, or false if the data doesn't exist, has expired, or if there was an error fetching it
+ * @return mixed The cached data, or false if the data doesn't exist,
+ *   has expired, or if there was an error fetching it
  */
 	public function read($key) {
 		$key = $this->_key($key);
 
 		$time = time();
-		$cachetime = intval(apc_fetch($key . '_expires'));
+		$cachetime = (int)apc_fetch($key . '_expires');
 		if ($cachetime !== 0 && ($cachetime < $time || ($time + $this->_config['duration']) < $cachetime)) {
 			return false;
 		}

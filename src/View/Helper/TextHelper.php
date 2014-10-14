@@ -15,7 +15,7 @@
 namespace Cake\View\Helper;
 
 use Cake\Core\App;
-use Cake\Error;
+use Cake\Core\Exception\Exception;
 use Cake\View\Helper;
 use Cake\View\View;
 
@@ -69,9 +69,9 @@ class TextHelper extends Helper {
  * - `engine` Class name to use to replace String functionality.
  *            The class needs to be placed in the `Utility` directory.
  *
- * @param View $View the view object the helper is attached to.
+ * @param \Cake\View\View $View the view object the helper is attached to.
  * @param array $config Settings array Settings array
- * @throws \Cake\Error\Exception when the engine class could not be found.
+ * @throws \Cake\Core\Exception\Exception when the engine class could not be found.
  */
 	public function __construct(View $View, array $config = array()) {
 		parent::__construct($View, $config);
@@ -81,7 +81,7 @@ class TextHelper extends Helper {
 		if ($engineClass) {
 			$this->_engine = new $engineClass($config);
 		} else {
-			throw new Error\Exception(sprintf('Class for %s could not be found', $config['engine']));
+			throw new Exception(sprintf('Class for %s could not be found', $config['engine']));
 		}
 	}
 
@@ -220,7 +220,7 @@ class TextHelper extends Helper {
  */
 	public function autoLink($text, array $options = array()) {
 		$text = $this->autoLinkUrls($text, $options);
-		return $this->autoLinkEmails($text, array_merge($options, array('escape' => false)));
+		return $this->autoLinkEmails($text, array('escape' => false) + $options);
 	}
 
 /**

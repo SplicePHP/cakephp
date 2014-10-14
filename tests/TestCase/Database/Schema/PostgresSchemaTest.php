@@ -51,9 +51,9 @@ class PostgresSchemaTest extends TestCase {
 		$table = <<<SQL
 CREATE TABLE schema_authors (
 id SERIAL,
-name VARCHAR(50),
+name VARCHAR(50) DEFAULT 'bob',
 bio DATE,
-position INT,
+position INT DEFAULT 1,
 created TIMESTAMP,
 PRIMARY KEY (id),
 CONSTRAINT "unique_position" UNIQUE ("position")
@@ -338,6 +338,70 @@ SQL;
 	}
 
 /**
+ * Test describing a table containing defaults with Postgres
+ *
+ * @return void
+ */
+	public function testDescribeTableWithDefaults() {
+		$connection = ConnectionManager::get('test');
+		$this->_createTables($connection);
+
+		$schema = new SchemaCollection($connection);
+		$result = $schema->describe('schema_authors');
+		$expected = [
+			'id' => [
+				'type' => 'integer',
+				'null' => false,
+				'default' => null,
+				'length' => 10,
+				'precision' => null,
+				'unsigned' => null,
+				'comment' => null,
+				'autoIncrement' => true,
+			],
+			'name' => [
+				'type' => 'string',
+				'null' => true,
+				'default' => 'bob',
+				'length' => 50,
+				'precision' => null,
+				'comment' => null,
+				'fixed' => null,
+			],
+			'bio' => [
+				'type' => 'date',
+				'null' => true,
+				'default' => null,
+				'length' => null,
+				'precision' => null,
+				'comment' => null,
+			],
+			'position' => [
+				'type' => 'integer',
+				'null' => true,
+				'default' => '1',
+				'length' => 10,
+				'precision' => null,
+				'comment' => null,
+				'unsigned' => null,
+				'autoIncrement' => null,
+			],
+			'created' => [
+				'type' => 'timestamp',
+				'null' => true,
+				'default' => null,
+				'length' => null,
+				'precision' => null,
+				'comment' => null,
+			],
+		];
+		$this->assertEquals(['id'], $result->primaryKey());
+		foreach ($expected as $field => $definition) {
+			$this->assertEquals($definition, $result->column($field), "Mismatch in $field column");
+		}
+	}
+
+/**
  * Test describing a table with containing keywords
  *
  * @return void
@@ -616,31 +680,31 @@ SQL;
 				'author_id_idx',
 				['type' => 'foreign', 'columns' => ['author_id'], 'references' => ['authors', 'id']],
 				'CONSTRAINT "author_id_idx" FOREIGN KEY ("author_id") ' .
-				'REFERENCES "authors" ("id") ON UPDATE RESTRICT ON DELETE RESTRICT'
+				'REFERENCES "authors" ("id") ON UPDATE RESTRICT ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE'
 			],
 			[
 				'author_id_idx',
 				['type' => 'foreign', 'columns' => ['author_id'], 'references' => ['authors', 'id'], 'update' => 'cascade'],
 				'CONSTRAINT "author_id_idx" FOREIGN KEY ("author_id") ' .
-				'REFERENCES "authors" ("id") ON UPDATE CASCADE ON DELETE RESTRICT'
+				'REFERENCES "authors" ("id") ON UPDATE CASCADE ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE'
 			],
 			[
 				'author_id_idx',
 				['type' => 'foreign', 'columns' => ['author_id'], 'references' => ['authors', 'id'], 'update' => 'restrict'],
 				'CONSTRAINT "author_id_idx" FOREIGN KEY ("author_id") ' .
-				'REFERENCES "authors" ("id") ON UPDATE RESTRICT ON DELETE RESTRICT'
+				'REFERENCES "authors" ("id") ON UPDATE RESTRICT ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE'
 			],
 			[
 				'author_id_idx',
 				['type' => 'foreign', 'columns' => ['author_id'], 'references' => ['authors', 'id'], 'update' => 'setNull'],
 				'CONSTRAINT "author_id_idx" FOREIGN KEY ("author_id") ' .
-				'REFERENCES "authors" ("id") ON UPDATE SET NULL ON DELETE RESTRICT'
+				'REFERENCES "authors" ("id") ON UPDATE SET NULL ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE'
 			],
 			[
 				'author_id_idx',
 				['type' => 'foreign', 'columns' => ['author_id'], 'references' => ['authors', 'id'], 'update' => 'noAction'],
 				'CONSTRAINT "author_id_idx" FOREIGN KEY ("author_id") ' .
-				'REFERENCES "authors" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT'
+				'REFERENCES "authors" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE'
 			],
 		];
 	}
@@ -814,7 +878,7 @@ SQL;
 		$table = new Table('schema_articles');
 		$result = $table->dropSql($connection);
 		$this->assertCount(1, $result);
-		$this->assertEquals('DROP TABLE "schema_articles"', $result[0]);
+		$this->assertEquals('DROP TABLE "schema_articles" CASCADE', $result[0]);
 	}
 
 /**
@@ -836,7 +900,7 @@ SQL;
 			]);
 		$result = $table->truncateSql($connection);
 		$this->assertCount(1, $result);
-		$this->assertEquals('TRUNCATE "schema_articles" RESTART IDENTITY', $result[0]);
+		$this->assertEquals('TRUNCATE "schema_articles" RESTART IDENTITY CASCADE', $result[0]);
 	}
 
 /**

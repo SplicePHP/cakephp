@@ -17,8 +17,8 @@ namespace Cake\Shell\Task;
 use Cake\Console\Shell;
 use Cake\Core\App;
 use Cake\Core\Plugin;
-use Cake\Utility\File;
-use Cake\Utility\Folder;
+use Cake\Filesystem\File;
+use Cake\Filesystem\Folder;
 use Cake\Utility\Inflector;
 
 /**
@@ -155,7 +155,7 @@ class ExtractTask extends Shell {
 			if (!Plugin::loaded($plugin)) {
 				Plugin::load($plugin);
 			}
-			$this->_paths = [Plugin::path($plugin)];
+			$this->_paths = [Plugin::classPath($plugin)];
 			$this->params['plugin'] = $plugin;
 		} else {
 			$this->_getPaths();
@@ -361,10 +361,7 @@ class ExtractTask extends Shell {
 			$this->_parse('__x', array('context', 'singular'));
 			$this->_parse('__xn', array('context', 'singular', 'plural'));
 			$this->_parse('__dx', array('domain', 'context', 'singular'));
-			$this->_parse('__dxc', array('domain', 'context', 'singular', 'category'));
 			$this->_parse('__dxn', array('domain', 'context', 'singular', 'plural'));
-			$this->_parse('__dxcn', array('domain', 'context', 'singular', 'plural', 'count', 'category'));
-			$this->_parse('__xc', array('context', 'singular', 'category'));
 
 		}
 	}

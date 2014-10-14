@@ -17,7 +17,8 @@
 namespace Cake\Error;
 
 use Cake\Core\App;
-use Cake\Utility\Debugger;
+use Cake\Error\Debugger;
+use Exception;
 
 /**
  * Error Handler provides basic error and exception handling for your application. It captures and
@@ -46,7 +47,7 @@ use Cake\Utility\Debugger;
  *
  * If you don't want to take control of the exception handling, but want to change how exceptions are
  * rendered you can use `exceptionRenderer` option to choose a class to render exception pages. By default
- * `Cake\Error\ExceptionRenderer` is used. Your custom exception renderer class should be placed in app/Error.
+ * `Cake\Error\ExceptionRenderer` is used. Your custom exception renderer class should be placed in src/Error.
  *
  * Your custom renderer should expect an exception in its constructor, and implement a render method.
  * Failing to do so will cause additional errors.
@@ -100,7 +101,7 @@ class ErrorHandler extends BaseErrorHandler {
 			'trace' => false,
 			'exceptionRenderer' => 'Cake\Error\ExceptionRenderer',
 		];
-		$this->_options = array_merge($defaults, $options);
+		$this->_options = $options + $defaults;
 	}
 
 /**
@@ -132,11 +133,13 @@ class ErrorHandler extends BaseErrorHandler {
 		$renderer = App::className($this->_options['exceptionRenderer'], 'Error');
 		try {
 			if (!$renderer) {
-				throw new \Exception("$renderer is an invalid class.");
+				throw new Exception("$renderer is an invalid class.");
 			}
 			$error = new $renderer($exception);
-			$error->render();
-		} catch (\Exception $e) {
+			$response = $error->render();
+			$this->_clearOutput();
+			$this->_sendResponse($response);
+		} catch (Exception $e) {
 			// Disable trace for internal errors.
 			$this->_options['trace'] = false;
 			$message = sprintf("[%s] %s\n%s", // Keeping same message format
@@ -146,6 +149,33 @@ class ErrorHandler extends BaseErrorHandler {
 			);
 			trigger_error($message, E_USER_ERROR);
 		}
+	}
+
+/**
+ * Clear output buffers so error pages display properly.
+ *
+ * Easily stubbed in testing.
+ *
+ * @return void
+ */
+	protected function _clearOutput() {
+		while (ob_get_level()) {
+			ob_end_clean();
+		}
+	}
+
+/**
+ * Method that can be easily stubbed in testing.
+ *
+ * @param string|Cake\Network\Response $response Either the message or response object.
+ * @return void
+ */
+	protected function _sendResponse($response) {
+		if (is_string($response)) {
+			echo $response;
+			return;
+		}
+		$response->send();
 	}
 
 }

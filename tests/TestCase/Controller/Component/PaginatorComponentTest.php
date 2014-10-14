@@ -19,7 +19,7 @@ use Cake\Controller\Component\PaginatorComponent;
 use Cake\Controller\Controller;
 use Cake\Core\Configure;
 use Cake\Datasource\ConnectionManager;
-use Cake\Error;
+use Cake\Network\Exception\NotFoundException;
 use Cake\Network\Request;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
@@ -46,7 +46,7 @@ class PaginatorComponentTest extends TestCase {
  *
  * @var array
  */
-	public $fixtures = array('core.post');
+	public $fixtures = array('core.posts');
 
 /**
  * Don't load data for fixtures for all tests
@@ -139,6 +139,32 @@ class PaginatorComponentTest extends TestCase {
 				'whitelist' => ['limit', 'sort', 'page', 'direction'],
 			]);
 		$this->Paginator->paginate($table, $settings);
+	}
+
+/**
+ * Test to make sure options get sent to custom finder methods via paginate
+ *
+ * @return void
+ */
+	public function testPaginateCustomFinderOptions() {
+		$this->loadFixtures('Posts');
+		$settings = [
+			'PaginatorPosts' => [
+				'finder' => ['author' => ['author_id' => 1]]
+			]
+		];
+		$table = TableRegistry::get('PaginatorPosts');
+
+		$expected = $table
+			->find('author', [
+				'conditions' => [
+					'PaginatorPosts.author_id' => 1
+				]
+			])
+			->count();
+		$result = $this->Paginator->paginate($table, $settings)->count();
+
+		$this->assertEquals($expected, $result);
 	}
 
 /**
@@ -443,14 +469,14 @@ class PaginatorComponentTest extends TestCase {
  * @return void
  */
 	public function testOutOfRangePageNumberGetsClamped() {
-		$this->loadFixtures('Post');
+		$this->loadFixtures('Posts');
 		$this->request->query['page'] = 3000;
 
 		$table = TableRegistry::get('PaginatorPosts');
 		try {
 			$this->Paginator->paginate($table);
 			$this->fail('No exception raised');
-		} catch (\Cake\Error\NotFoundException $e) {
+		} catch (NotFoundException $e) {
 			$this->assertEquals(
 				1,
 				$this->request->params['paging']['PaginatorPosts']['page'],
@@ -462,11 +488,11 @@ class PaginatorComponentTest extends TestCase {
 /**
  * Test that a really REALLY large page number gets clamped to the max page size.
  *
- * @expectedException \Cake\Error\NotFoundException
+ * @expectedException \Cake\Network\Exception\NotFoundException
  * @return void
  */
 	public function testOutOfVeryBigPageNumberGetsClamped() {
-		$this->loadFixtures('Post');
+		$this->loadFixtures('Posts');
 		$this->request->query = [
 			'page' => '3000000000000000000000000',
 		];
@@ -634,7 +660,7 @@ class PaginatorComponentTest extends TestCase {
  * @return void
  */
 	public function testPaginateMaxLimit() {
-		$this->loadFixtures('Post');
+		$this->loadFixtures('Posts');
 		$table = TableRegistry::get('PaginatorPosts');
 
 		$settings = [
@@ -661,7 +687,7 @@ class PaginatorComponentTest extends TestCase {
  * @return void
  */
 	public function testPaginateCustomFind() {
-		$this->loadFixtures('Post');
+		$this->loadFixtures('Posts');
 		$idExtractor = function ($result) {
 			$ids = [];
 			foreach ($result as $record) {
@@ -714,7 +740,7 @@ class PaginatorComponentTest extends TestCase {
  * @return void
  */
 	public function testPaginateCustomFindOldOption() {
-		$this->loadFixtures('Post');
+		$this->loadFixtures('Posts');
 		$table = TableRegistry::get('PaginatorPosts');
 		$this->Paginator->paginate($table, ['findType' => 'published']);
 	}
@@ -725,7 +751,7 @@ class PaginatorComponentTest extends TestCase {
  * @return void
  */
 	public function testPaginateCustomFindFieldsArray() {
-		$this->loadFixtures('Post');
+		$this->loadFixtures('Posts');
 		$table = TableRegistry::get('PaginatorPosts');
 		$data = array('author_id' => 3, 'title' => 'Fourth Article', 'body' => 'Article Body, unpublished', 'published' => 'N');
 		$table->save(new \Cake\ORM\Entity($data));

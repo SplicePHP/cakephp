@@ -15,8 +15,7 @@
 namespace Cake\Event;
 
 /**
- *
- * Provides the _eventManager property for usage in classes that require it.
+ * Provides the event manager interface features for usage in classes that require it.
  *
  */
 trait EventManagerTrait {
@@ -28,6 +27,13 @@ trait EventManagerTrait {
  * @var \Cake\Event\EventManager
  */
 	protected $_eventManager = null;
+
+/**
+ * Default class name for new event objects.
+ *
+ * @var string
+ */
+	protected $_eventClass = '\Cake\Event\Event';
 
 /**
  * Returns the Cake\Event\EventManager manager instance for this object.
@@ -45,6 +51,31 @@ trait EventManagerTrait {
 			$this->_eventManager = new EventManager();
 		}
 		return $this->_eventManager;
+	}
+
+/**
+ * Wrapper for creating and dispatching events. 
+ *
+ * Returns a dispatched event.
+ *
+ * @param string $name Name of the event.
+ * @param array $data Any value you wish to be transported with this event to
+ * it can be read by listeners.
+ *
+ * @param object $subject The object that this event applies to 
+ * ($this by default).
+ *
+ * @return \Cake\Event\Event
+ */
+	public function dispatchEvent($name, $data = null, $subject = null) {
+		if ($subject === null) {
+			$subject = $this;
+		}
+
+		$event = new $this->_eventClass($name, $subject, $data);
+		$this->eventManager()->dispatch($event);
+
+		return $event;
 	}
 
 }

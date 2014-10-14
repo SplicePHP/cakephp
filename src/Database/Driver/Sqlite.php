@@ -15,7 +15,6 @@
 namespace Cake\Database\Driver;
 
 use Cake\Database\Dialect\SqliteDialectTrait;
-use Cake\Database\Query;
 use Cake\Database\Statement\PDOStatement;
 use Cake\Database\Statement\SqliteStatement;
 use PDO;
@@ -42,7 +41,7 @@ class Sqlite extends \Cake\Database\Driver {
 	];
 
 /**
- * Establishes a connection to the databse server
+ * Establishes a connection to the database server
  *
  * @return bool true on success
  */
